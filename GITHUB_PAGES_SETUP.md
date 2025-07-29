@@ -76,7 +76,7 @@ A repository (or "repo") is like a folder on GitHub that contains all your app's
 1. **Go to [GitHub.com](https://github.com) and log in**
 2. **Click the green "New" button** or look for a "+" icon in the top-right
 3. **Fill out the form:**
-   - **Repository name:** Type `habit-tracker` (exactly like this)
+   - **Repository name:** Type `HT` (short for Habit Tracker)
    - **Description:** Type "A habit tracking app for me and my friends"
    - **Make sure it's set to "Public"** (this is required for free GitHub Pages)
    - **DON'T check any of the initialize boxes** (we already have code)
@@ -152,10 +152,10 @@ Press Enter, wait for it to finish.
 
 **Command 5 (Replace YOUR_USERNAME with your actual GitHub username):**
 ```
-git remote add origin https://github.com/YOUR_USERNAME/habit-tracker.git
+git remote add origin https://github.com/YOUR_USERNAME/HT.git
 ```
-Example: If your username is "john123", you'd type:
-`git remote add origin https://github.com/john123/habit-tracker.git`
+Example: If your username is "nkagupta", you'd type:
+`git remote add origin https://github.com/nkagupta/HT.git`
 
 **Command 6:**
 ```
@@ -165,8 +165,15 @@ Copy exactly: `git push -u origin main`
 This will upload your code to GitHub.
 
 ### What if you get an error?
+- **If you get a 403 error:** The repository doesn't exist yet - go back to Step 3 and create it first
 - **If it asks for your username/password:** Enter your GitHub username and password
-- **If it says "permission denied":** You might need to set up authentication (see troubleshooting section below)
+- **If it says "permission denied":** Try using a Personal Access Token instead of password:
+  1. Go to GitHub.com → Settings (your profile) → Developer settings → Personal access tokens → Tokens (classic)
+  2. Click "Generate new token (classic)"
+  3. Give it a name like "HT-Deploy" 
+  4. Check the "repo" box
+  5. Click "Generate token"
+  6. Copy the token and use it as your password when Git asks
 
 ## 🎯 Step 5: Set Up Your Secret Keys
 
@@ -236,12 +243,13 @@ Deployment is the process of taking your code and turning it into a live website
 ## 🎉 Step 9: Access Your Live Website!
 
 ### Your website will be available at:
-`https://YOUR_USERNAME.github.io/habit-tracker/`
+`https://YOUR_USERNAME.github.io/HT/`
 
-### Replace `YOUR_USERNAME` with your actual GitHub username
+### For you specifically, it should be:
+`https://nkagupta.github.io/HT/`
 
-**Example:** If your GitHub username is "john123", your website would be:
-`https://john123.github.io/habit-tracker/`
+### Share this URL with your friends:
+`https://nkagupta.github.io/HT/`
 
 ### What to expect:
 - ✅ You should see the login screen
@@ -293,13 +301,34 @@ Deployment is the process of taking your code and turning it into a live website
    - Type `cmd` and press Enter
    - This opens the correct terminal for Windows
 
+### Issue: "fatal: unable to access" or "403 error"
+**This means the repository doesn't exist on GitHub yet**
+**Solution:**
+1. **First, go to GitHub.com and create the repository:**
+   - Repository name: `HT`
+   - Make it Public
+   - Don't initialize with any files
+2. **Make sure you're using the correct URL:**
+   - For you: `https://github.com/nkagupta/HT.git`
+3. **Try the git push command again**
+4. **If still getting 403, create a Personal Access Token (see above)**
 
 ### Issue: "Permission denied" when pushing to GitHub
 **Solutions:**
-1. **Try using personal access token instead of password:**
-   - Go to GitHub.com → Settings → Developer settings → Personal access tokens
-   - Generate new token with "repo" permissions
-   - Use this token instead of your password
+1. **Create a Personal Access Token (recommended):**
+   - Go to GitHub.com → Click your profile picture → Settings
+   - Scroll down to "Developer settings" → "Personal access tokens" → "Tokens (classic)"
+   - Click "Generate new token (classic)"
+   - Name: `HT-Deployment`
+   - Expiration: `90 days` (or longer)
+   - Check the box for `repo` (this gives full repository access)
+   - Click "Generate token"
+   - **IMPORTANT:** Copy the token immediately (you won't see it again)
+   - When Git asks for password, paste this token instead
+
+2. **Make sure the repository exists:**
+   - Go to `https://github.com/nkagupta/HT` in your browser
+   - If you see "404 Not Found", go back to Step 3 and create the repository first
 
 2. **Or set up SSH (more advanced):**
    - Follow GitHub's SSH guide: https://docs.github.com/en/authentication/connecting-to-github-with-ssh
