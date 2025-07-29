@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Mail, Eye, EyeOff, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { User as UserType, HABIT_COLORS } from '../utils/types';
+import { User as UserType } from '../utils/types';
 
 interface LoginScreenProps {
   onLogin: (user: UserType) => void;
@@ -72,56 +72,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           email,
           password
         });
-
-        if (error) throw error;
-
-        // Fetch user profile after successful login
-        const { data: userData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (userData) {
-          onLogin({
-            id: userData.id,
-            email: userData.email,
-            name: userData.name
-          });
-        }
-      } else {
-        // Handle user registration
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password
-        });
-
-        if (error) throw error;
-
-        if (data.user) {
-          // Create user profile record in database
-          const { error: profileError } = await supabase
-            .from('users')
-            .insert([
-              {
-                id: data.user.id,
-                email: data.user.email!,
-                name: name
-              }
-            ]);
-
-          if (profileError) throw profileError;
-
-          // Log in the new user
-          onLogin({
-            id: data.user.id,
-            email: data.user.email!,
-            name: name
-          });
-        }
       }
-    } catch (error: any) {
-      setError(error.message);
+    } catch (err) {
+      setError('An error occurred');
     } finally {
       setLoading(false);
     }

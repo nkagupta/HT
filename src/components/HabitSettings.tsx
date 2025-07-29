@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, X, Zap, CheckCircle, AlertCircle, Info, Settings } from 'lucide-react';
+import { Save, Plus, X, Zap, CheckCircle, AlertCircle, Info, Settings, Target } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { User, Habit, HabitType, HABIT_COLORS } from '../utils/types';
 
@@ -7,17 +7,19 @@ interface HabitSettingsProps {
   currentUser: User;
 }
 
-interface DefaultHabitSuggestion {
-  name: string;
-  type: HabitType;
-  target: string;
-  color: string;
+/**
+ * Redesigned 3-Field Habit Suggestion Structure
+ */
+interface HabitSuggestion {
+  name: string;        // Field 1: What you're tracking
+  target: string;      // Field 2: Your yearly objective  
+  type: HabitType;     // Field 3: How progress is measured
+  color: string;       // Visual identification only
 }
 
 interface ConfirmationState {
   isOpen: boolean;
-  suggestions: DefaultHabitSuggestion[];
-  editingIndex: number | null;
+  suggestions: HabitSuggestion[];
 }
 
 const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
@@ -29,18 +31,17 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
     message: string;
   } | null>(null);
   
-  // New confirmation system state
+  // Confirmation system for suggestions
   const [confirmationState, setConfirmationState] = useState<ConfirmationState>({
     isOpen: false,
-    suggestions: [],
-    editingIndex: null
+    suggestions: []
   });
   
-  // Standardized 3-field habit creation
+  // Custom habit creation with 3 fields
   const [newHabit, setNewHabit] = useState({ 
-    name: '', 
-    target: '',
-    type: 'exercise' as HabitType, 
+    name: '',           // Field 1: Habit Name 
+    target: '',         // Field 2: Annual Target
+    type: 'exercise' as HabitType,  // Field 3: Tracking Method
     color: HABIT_COLORS[0]
   });
   const [showAddCustom, setShowAddCustom] = useState(false);
@@ -83,69 +84,131 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
     }
   };
 
-  // Get default habit suggestions for user
-  const getDefaultSuggestions = (): DefaultHabitSuggestion[] => {
-    const defaultHabits: { [key: string]: DefaultHabitSuggestion[] } = {
+  /**
+   * Redesigned Default Suggestions Based on 3-Field Structure
+   * These are SUGGESTIONS ONLY - require user confirmation
+   */
+  const getPersonalizedSuggestions = (): HabitSuggestion[] => {
+    const suggestionsByUser: { [key: string]: HabitSuggestion[] } = {
       'Anuj Nawal': [
-        { name: 'Read 6 Books', type: 'book', target: '6 books', color: HABIT_COLORS[0] },
-        { name: 'Gym 12 Times/Month', type: 'exercise', target: '144 sessions', color: HABIT_COLORS[1] },
-        { name: 'Learn AI', type: 'ai_learning', target: '96 topics', color: HABIT_COLORS[2] }
+        { 
+          name: 'Daily Reading Habit', 
+          target: '6 books per year', 
+          type: 'book', 
+          color: HABIT_COLORS[0] 
+        },
+        { 
+          name: 'Regular Gym Sessions', 
+          target: '144 sessions per year', 
+          type: 'exercise', 
+          color: HABIT_COLORS[1] 
+        },
+        { 
+          name: 'AI Learning Journey', 
+          target: '96 topics per year', 
+          type: 'ai_learning', 
+          color: HABIT_COLORS[2] 
+        }
       ],
       'Suraj Rarath': [
-        { name: 'Half Marathon Training', type: 'running', target: '1200 km', color: HABIT_COLORS[0] },
-        { name: 'Swimming Practice', type: 'swimming', target: '240 hours', color: HABIT_COLORS[1] },
-        { name: 'Read 6 Books', type: 'book', target: '6 books', color: HABIT_COLORS[2] }
+        { 
+          name: 'Marathon Training', 
+          target: '600 km per year', 
+          type: 'running', 
+          color: HABIT_COLORS[0] 
+        },
+        { 
+          name: 'Swimming Practice', 
+          target: '240 hours per year', 
+          type: 'swimming', 
+          color: HABIT_COLORS[1] 
+        },
+        { 
+          name: 'Reading Challenge', 
+          target: '12 books per year', 
+          type: 'book', 
+          color: HABIT_COLORS[2] 
+        }
       ],
       'Krishna Amar': [
-        { name: 'Run 500km/Year', type: 'running', target: '500 km', color: HABIT_COLORS[0] },
-        { name: 'Read 10 Books', type: 'book', target: '10 books', color: HABIT_COLORS[1] },
-        { name: 'Weight Loss (10kg)', type: 'weight', target: '75 kg', color: HABIT_COLORS[2] }
+        { 
+          name: 'Running Goal', 
+          target: '500 km per year', 
+          type: 'running', 
+          color: HABIT_COLORS[0] 
+        },
+        { 
+          name: 'Reading Goal', 
+          target: '10 books per year', 
+          type: 'book', 
+          color: HABIT_COLORS[1] 
+        },
+        { 
+          name: 'Weight Management', 
+          target: '75 kg target weight', 
+          type: 'weight', 
+          color: HABIT_COLORS[2] 
+        }
       ],
       'Ritwik Garg': [
-        { name: 'Job Search', type: 'job_search', target: '240 activities', color: HABIT_COLORS[0] },
-        { name: 'Learn AI', type: 'ai_learning', target: '96 topics', color: HABIT_COLORS[1] },
-        { name: 'Instagram Growth', type: 'instagram', target: '5000 followers', color: HABIT_COLORS[2] }
+        { 
+          name: 'Job Search Activities', 
+          target: '240 activities per year', 
+          type: 'job_search', 
+          color: HABIT_COLORS[0] 
+        },
+        { 
+          name: 'AI Skill Development', 
+          target: '96 topics per year', 
+          type: 'ai_learning', 
+          color: HABIT_COLORS[1] 
+        },
+        { 
+          name: 'Instagram Growth', 
+          target: '5000 followers', 
+          type: 'instagram', 
+          color: HABIT_COLORS[2] 
+        }
       ]
     };
 
     // Try exact match first, then partial match
-    let suggestions = defaultHabits[currentUser.name] || [];
+    let suggestions = suggestionsByUser[currentUser.name] || [];
     
     if (suggestions.length === 0) {
-      const nameKey = Object.keys(defaultHabits).find(key => 
+      const nameKey = Object.keys(suggestionsByUser).find(key => 
         currentUser.name.toLowerCase().includes(key.toLowerCase()) || 
         key.toLowerCase().includes(currentUser.name.toLowerCase())
       );
       if (nameKey) {
-        suggestions = defaultHabits[nameKey];
+        suggestions = suggestionsByUser[nameKey];
       }
     }
 
-    // Filter out habits that already exist
+    // Filter out suggestions that match existing habit names
     const existingHabitNames = habits.map(h => h.name.toLowerCase());
     return suggestions.filter(suggestion => 
       !existingHabitNames.includes(suggestion.name.toLowerCase())
     );
   };
 
-  // Show default habit confirmation dialog
-  const showDefaultConfirmation = () => {
-    const suggestions = getDefaultSuggestions();
+  // Show suggestion confirmation dialog (NO automatic addition)
+  const showSuggestionDialog = () => {
+    const suggestions = getPersonalizedSuggestions();
     
     if (suggestions.length === 0) {
-      showNotification('info', `No default habits available for "${currentUser.name}". All suggestions may already exist.`);
+      showNotification('info', `No new suggestions available. You may have already added similar habits.`);
       return;
     }
 
     setConfirmationState({
       isOpen: true,
-      suggestions,
-      editingIndex: null
+      suggestions
     });
   };
 
   // Update suggestion in confirmation dialog
-  const updateSuggestion = (index: number, updates: Partial<DefaultHabitSuggestion>) => {
+  const updateSuggestion = (index: number, updates: Partial<HabitSuggestion>) => {
     setConfirmationState(prev => ({
       ...prev,
       suggestions: prev.suggestions.map((suggestion, i) => 
@@ -154,16 +217,16 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
     }));
   };
 
-  // Confirm and save suggested habits
-  const confirmDefaultHabits = async () => {
+  // Only add habits after explicit user confirmation
+  const confirmSuggestions = async () => {
     setSaving(true);
     try {
       const habitsToAdd = confirmationState.suggestions.map(suggestion => ({
-        user_id: currentUser.id,
-        name: suggestion.name,
-        type: suggestion.type,
-        color: suggestion.color,
-        target: suggestion.target
+        user_id: currentUser.id,      
+        name: suggestion.name,        // Field 1: Habit Name
+        target: suggestion.target,    // Field 2: Annual Target  
+        type: suggestion.type,        // Field 3: Tracking Method
+        color: suggestion.color
       }));
 
       const { data, error } = await supabase
@@ -174,19 +237,20 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
       if (error) throw error;
 
       setHabits([...habits, ...(data || [])]);
-      setConfirmationState({ isOpen: false, suggestions: [], editingIndex: null });
+      setConfirmationState({ isOpen: false, suggestions: [] });
       showNotification('success', `Successfully added ${habitsToAdd.length} habit${habitsToAdd.length > 1 ? 's' : ''}!`);
       
     } catch (error) {
-      console.error('Error adding default habits:', error);
+      console.error('Error adding suggested habits:', error);
       showNotification('error', 'Failed to add habits. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const addHabit = async () => {
-    if (!newHabit.name.trim() || habits.length >= 6) return;
+  // Add custom habit with 3 required fields
+  const addCustomHabit = async () => {
+    if (!newHabit.name.trim() || !newHabit.target.trim() || habits.length >= 6) return;
 
     setSaving(true);
     try {
@@ -194,10 +258,10 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
         .from('habits')
         .insert([{
           user_id: currentUser.id,
-          name: newHabit.name.trim(),
-          type: newHabit.type,
-          color: newHabit.color,
-          target: newHabit.target.trim() || null
+          name: newHabit.name.trim(),       // Field 1: Habit Name
+          target: newHabit.target.trim(),   // Field 2: Annual Target
+          type: newHabit.type,              // Field 3: Tracking Method  
+          color: newHabit.color
         }])
         .select()
         .single();
@@ -240,6 +304,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
     }
   };
 
+  // Update existing habit (don't create new one)
   const updateHabit = async (habitId: string, updates: Partial<Habit>) => {
     if (!updates.name?.trim() && updates.name !== undefined) {
       showNotification('error', 'Habit name cannot be empty.');
@@ -295,53 +360,58 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
         </div>
       )}
 
-      {/* Default Habits Confirmation Dialog */}
+      {/* Suggestion Confirmation Dialog */}
       {confirmationState.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Confirm Default Habits</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Habit Suggestions</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Review and customize these suggested habits before adding them to your account.
+                Review and customize these suggested habits. Each habit has exactly 3 fields:
               </p>
+              <div className="text-xs text-gray-500 mt-2 space-y-1">
+                <div>• <strong>Habit Name:</strong> What you're tracking</div>
+                <div>• <strong>Target:</strong> Your yearly objective</div>
+                <div>• <strong>Tracking Method:</strong> How progress is measured</div>
+              </div>
             </div>
             
             <div className="p-4 space-y-4">
               {confirmationState.suggestions.map((suggestion, index) => (
                 <div key={index} className="p-4 border border-gray-200 rounded-lg">
                   <div className="space-y-3">
-                    {/* Habit Name */}
+                    {/* Field 1: Habit Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Habit Name
+                        1. Habit Name
                       </label>
                       <input
                         type="text"
                         value={suggestion.name}
                         onChange={(e) => updateSuggestion(index, { name: e.target.value })}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        placeholder="Enter habit name"
+                        placeholder="What you're tracking"
                       />
                     </div>
                     
-                    {/* Target */}
+                    {/* Field 2: Annual Target */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Annual Target
+                        2. Annual Target
                       </label>
                       <input
                         type="text"
                         value={suggestion.target}
                         onChange={(e) => updateSuggestion(index, { target: e.target.value })}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        placeholder="Enter yearly target"
+                        placeholder="Your yearly objective"
                       />
                     </div>
                     
-                    {/* Tracking Method */}
+                    {/* Field 3: Tracking Method */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tracking Method
+                        3. Tracking Method
                       </label>
                       <select
                         value={suggestion.type}
@@ -354,12 +424,15 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                           </option>
                         ))}
                       </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {habitTypes.find(t => t.value === suggestion.type)?.description}
+                      </p>
                     </div>
                     
                     {/* Color Selection */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Color
+                        Display Color
                       </label>
                       <div className="flex space-x-2">
                         {HABIT_COLORS.map(color => (
@@ -381,14 +454,14 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
             
             <div className="p-4 border-t border-gray-200 flex space-x-3">
               <button
-                onClick={() => setConfirmationState({ isOpen: false, suggestions: [], editingIndex: null })}
+                onClick={() => setConfirmationState({ isOpen: false, suggestions: [] })}
                 className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={confirmDefaultHabits}
-                disabled={saving || confirmationState.suggestions.some(s => !s.name.trim())}
+                onClick={confirmSuggestions}
+                disabled={saving || confirmationState.suggestions.some(s => !s.name.trim() || !s.target.trim())}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
@@ -405,17 +478,20 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
           <span className="text-sm text-gray-600">{habits.length}/6 habits</span>
         </div>
         
-        {/* Suggested Habits Section */}
+        {/* Personalized Suggestions Section */}
         <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-medium text-blue-900 mb-1">Suggested Habits</h3>
+              <h3 className="text-base font-medium text-blue-900 mb-1">Personalized Suggestions</h3>
               <p className="text-sm text-blue-700">
-                Get personalized habit suggestions for {currentUser.name.split(' ')[0]}
+                Get habit suggestions tailored for {currentUser.name.split(' ')[0]}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                ✓ Suggestions only - you confirm before adding
               </p>
             </div>
             <button
-              onClick={showDefaultConfirmation}
+              onClick={showSuggestionDialog}
               disabled={habits.length >= 6}
               className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -433,7 +509,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
               className="w-full flex items-center justify-center space-x-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
             >
               <Plus className="w-5 h-5" />
-              <span className="font-medium">Add Custom Habit</span>
+              <span className="font-medium">Create Custom Habit</span>
             </button>
           </div>
         )}
@@ -442,40 +518,60 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
         {showAddCustom && (
           <div className="mb-4 p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
             <h3 className="text-base font-medium text-gray-900 mb-3">Create Custom Habit</h3>
-            <p className="text-sm text-gray-600 mb-4">Design your own habit with these three essential fields:</p>
+            <p className="text-sm text-gray-600 mb-4">Design your habit with these three essential fields:</p>
             
             <div className="space-y-3">
               {/* Field 1: Habit Name */}
-              <input
-                type="text"
-                value={newHabit.name}
-                onChange={(e) => setNewHabit({ ...newHabit, name: e.target.value })}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="1. Habit Name (e.g., Morning Meditation, Daily Reading)"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  1. Habit Name
+                </label>
+                <input
+                  type="text"
+                  value={newHabit.name}
+                  onChange={(e) => setNewHabit({ ...newHabit, name: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="What you're tracking (e.g., Morning Reading, Daily Exercise)"
+                />
+              </div>
               
               {/* Field 2: Annual Target */}
-              <input
-                type="text"
-                value={newHabit.target}
-                onChange={(e) => setNewHabit({ ...newHabit, target: e.target.value })}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="2. Annual Target (e.g., 10 books, 500 km, 75 kg)"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  2. Annual Target
+                </label>
+                <input
+                  type="text"
+                  value={newHabit.target}
+                  onChange={(e) => setNewHabit({ ...newHabit, target: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="Your yearly objective (e.g., 12 books, 500 km, 75 kg)"
+                />
+              </div>
               
               {/* Field 3: Tracking Method */}
-              <select
-                value={newHabit.type}
-                onChange={(e) => setNewHabit({ ...newHabit, type: e.target.value as HabitType })}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              >
-                <option value="" disabled>3. Select Tracking Method</option>
-                {habitTypes.map(type => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  3. Tracking Method
+                </label>
+                <select
+                  value={newHabit.type}
+                  onChange={(e) => setNewHabit({ ...newHabit, type: e.target.value as HabitType })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                >
+                  <option value="" disabled>Select how progress is measured</option>
+                  {habitTypes.map(type => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+                {newHabit.type && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {habitTypes.find(t => t.value === newHabit.type)?.description}
+                  </p>
+                )}
+              </div>
               
               <div>
                 <p className="text-sm text-gray-700 mb-2 font-medium">Choose Display Color:</p>
@@ -494,8 +590,8 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
               </div>
               <div className="flex space-x-2">
                 <button
-                  onClick={addHabit}
-                  disabled={saving || !newHabit.name.trim()}
+                  onClick={addCustomHabit}
+                  disabled={saving || !newHabit.name.trim() || !newHabit.target.trim()}
                   className="flex-1 flex items-center justify-center space-x-2 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? (
@@ -519,6 +615,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
           </div>
         )}
         
+        {/* Current Habits List */}
         <div className="space-y-3 mb-4">
           <div>
             <label className="block text-base font-medium text-gray-700 mb-2">
@@ -530,14 +627,14 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                   <Target className="w-full h-full" />
                 </div>
                 <p className="text-sm">No habits created yet.</p>
-                <p className="text-xs">Use "Get Suggestions" or "Add Custom Habit" to start tracking!</p>
+                <p className="text-xs">Use "Get Suggestions" or "Create Custom Habit" to start tracking!</p>
               </div>
             )}
             <div className="space-y-4">
               {habits.map((habit) => (
                 <div key={habit.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-gray-900">Standardized 3-Field Habit:</h4>
+                    <h4 className="text-sm font-semibold text-gray-900">3-Field Habit Structure:</h4>
                     <div 
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: habit.color }}
@@ -554,7 +651,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                         updateHabit(habit.id, { name: e.target.value });
                       }}
                       className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="Enter habit name"
+                      placeholder="What you're tracking"
                     />
                   </div>
                   
@@ -568,7 +665,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                         updateHabit(habit.id, { target: e.target.value || null });
                       }}
                       className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="Enter yearly target (e.g., 10 books, 500 km, 75 kg)"
+                      placeholder="Your yearly objective (e.g., 12 books, 500 km, 75 kg)"
                     />
                   </div>
                   
