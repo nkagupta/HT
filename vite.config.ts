@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 const getBasePath = () => {
   // For GitHub Pages, the base path should be your repository name
   // You can set this as an environment variable or modify it manually
-  return process.env.GITHUB_REPOSITORY?.split('/')[1] ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/';
+  return process.env.GITHUB_REPOSITORY?.split('/')[1] ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/HT/';
 };
 
 // https://vitejs.dev/config/

@@ -326,6 +326,41 @@ Deployment is the process of taking your code and turning it into a live website
    - **IMPORTANT:** Copy the token immediately (you won't see it again)
    - When Git asks for password, paste this token instead
 
+### **Your Personal Access Token:**
+```
+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
+```
+
+### **How to Use Your Token:**
+
+**If Git prompts for username/password:**
+1. **Username:** Type your GitHub username (`nkagupta`)
+2. **Password:** Instead of your GitHub password, paste your token: `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`
+
+**If you need to clear cached credentials and try again:**
+```
+git config --global --unset credential.helper
+git push -u origin main
+```
+Then enter your username and token when prompted.
+
+### **Check if Your Push Actually Worked:**
+
+1. **Go to [github.com/nkagupta/HT](https://github.com/nkagupta/HT)**
+2. **Do you see your files there?** If yes, the push worked!
+3. **If the page says "404 Not Found"**, the repository doesn't exist - go back to Step 3 and create it
+
+### **Alternative: Set Up Token in Git (One-time setup):**
+```
+git config --global credential.helper store
+git push -u origin main
+```
+When prompted, enter:
+- Username: `nkagupta`  
+- Password: `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`
+
+Git will remember this for future pushes.
+
 2. **Make sure the repository exists:**
    - Go to `https://github.com/nkagupta/HT` in your browser
    - If you see "404 Not Found", go back to Step 3 and create the repository first

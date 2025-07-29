@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Download, Upload, User, LogOut, Settings, AlertTriangle } from 'lucide-react';
+import { BarChart } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import LoginScreen from './components/LoginScreen';
 import CalendarView from './components/CalendarView';
 import HabitSettings from './components/HabitSettings';
 import SummaryView from './components/SummaryView';
+import ChartsView from './components/ChartsView';
 import { User as UserType } from './utils/types';
 
 /**
@@ -24,7 +26,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   
   // Current view state - determines which component to render
-  const [currentView, setCurrentView] = useState<'calendar' | 'settings' | 'summary'>('calendar');
+  const [currentView, setCurrentView] = useState<'calendar' | 'settings' | 'summary' | 'charts'>('calendar');
   
   // Current date for calendar navigation
   const [currentDate] = useState(new Date());
@@ -326,43 +328,56 @@ function App() {
           </div>
           
           {/* Bottom navigation tabs */}
-          <div className="flex space-x-1">
+          <div className="grid grid-cols-4 gap-1">
             {/* Calendar view tab */}
             <button
               onClick={() => setCurrentView('calendar')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-medium rounded-lg transition-colors ${
+              className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
                 currentView === 'calendar' 
                   ? 'bg-blue-600 text-white' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Calendar className="w-4 h-4" />
+              <Calendar className="w-3 h-3" />
               <span>Calendar</span>
+            </button>
+            
+            {/* Charts view tab */}
+            <button
+              onClick={() => setCurrentView('charts')}
+              className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
+                currentView === 'charts' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <BarChart className="w-3 h-3" />
+              <span>Charts</span>
             </button>
             
             {/* Summary view tab */}
             <button
               onClick={() => setCurrentView('summary')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-medium rounded-lg transition-colors ${
+              className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
                 currentView === 'summary' 
                   ? 'bg-blue-600 text-white' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <User className="w-4 h-4" />
+              <User className="w-3 h-3" />
               <span>Summary</span>
             </button>
             
             {/* Settings view tab */}
             <button
               onClick={() => setCurrentView('settings')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-medium rounded-lg transition-colors ${
+              className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
                 currentView === 'settings' 
                   ? 'bg-blue-600 text-white' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-3 h-3" />
               <span>Settings</span>
             </button>
           </div>
@@ -377,6 +392,11 @@ function App() {
             currentUser={currentUser}
             currentDate={currentDate}
           />
+        )}
+        
+        {/* Charts View - Data visualization and progress tracking */}
+        {currentView === 'charts' && (
+          <ChartsView currentUser={currentUser} />
         )}
         
         {/* Summary View - Progress overview and statistics */}
