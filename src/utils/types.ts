@@ -35,15 +35,18 @@ export interface CustomField {
 
 /**
  * Habit interface - represents a trackable habit
+ * Standardized to exactly 3 fields for friend competition consistency
  */
 export interface Habit {
   id: string;
   user_id: string;
+  // Field 1: Habit Name
   name: string;
+  // Field 2: Tracking Method
   type: HabitType;
+  // Field 3: Target (Annual Goal)
   color: string;
-  target?: string;
-  custom_fields?: CustomField[];
+  color: string; // For UI display only
 }
 
 /**
@@ -115,8 +118,36 @@ export interface HabitCompletion {
   habit_id: string;
   date: string;
   data: HabitCompletionData;
+  created_at?: string;
+  updated_at?: string;
 }
 
+/**
+ * Friend Competition Data Structures
+ */
+export interface UserProgress {
+  user: User;
+  habits: Habit[];
+  totalLogged: {
+    pages: number;
+    kilometers: number;
+    minutes: number;
+    topics: number;
+    activities: number;
+  };
+  currentStreak: number;
+  weeklyTotal: number;
+  monthlyTotal: number;
+}
+
+export interface CompetitionMetrics {
+  userId: string;
+  userName: string;
+  habitType: HabitType;
+  totalLogged: number;
+  unit: string;
+  target?: string;
+}
 /** Book record - represents a book being read */
 export interface Book {
   id: string;
