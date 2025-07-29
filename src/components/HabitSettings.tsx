@@ -8,7 +8,7 @@ interface HabitSettingsProps {
 }
 
 /**
- * Redesigned 3-Field Habit Suggestion Structure
+ * 3-Field Habit Suggestion Structure
  */
 interface HabitSuggestion {
   name: string;        // Field 1: What you're tracking
@@ -86,7 +86,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
 
   /**
    * Redesigned Default Suggestions Based on 3-Field Structure
-   * These are SUGGESTIONS ONLY - require user confirmation
+   * SUGGESTIONS ONLY - require user confirmation
    */
   const getPersonalizedSuggestions = (): HabitSuggestion[] => {
     const suggestionsByUser: { [key: string]: HabitSuggestion[] } = {
@@ -615,7 +615,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
           </div>
         )}
         
-        {/* Current Habits List */}
+        {/* Current Habits List - PROPER 3-FIELD STRUCTURE */}
         <div className="space-y-3 mb-4">
           <div>
             <label className="block text-base font-medium text-gray-700 mb-2">
