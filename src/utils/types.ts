@@ -42,6 +42,7 @@ export interface Habit {
   name: string;
   type: HabitType;
   color: string;
+  target?: string;
   custom_fields?: CustomField[];
 }
 

@@ -35,56 +35,56 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
    * Each user gets 3 personalized habits based on their goals and preferences.
    */
   const addDefaultHabits = async (userId: string, userName: string) => {
-    const defaultHabits: { [key: string]: Array<{ name: string; type: string; color: string }> } = {
+    const defaultHabits: { [key: string]: Array<{ name: string; type: string; color: string; target: string }> } = {
       // Anuj's fitness and learning goals
       'Anuj Nawal': [
-        { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[0] },
-        { name: 'Gym 12 Times/Month', type: 'exercise', color: HABIT_COLORS[1] },
-        { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[2] }
+        { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[0], target: '6 books' },
+        { name: 'Gym 12 Times/Month', type: 'exercise', color: HABIT_COLORS[1], target: '144 sessions' },
+        { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[2], target: '96 topics' }
       ],
       // Suraj's endurance and reading goals
       'Suraj Rarath': [
-        { name: 'Half Marathon Training', type: 'running', color: HABIT_COLORS[0] },
-        { name: 'Swimming Practice', type: 'swimming', color: HABIT_COLORS[1] },
-        { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[2] }
+        { name: 'Half Marathon Training', type: 'running', color: HABIT_COLORS[0], target: '1200 km' },
+        { name: 'Swimming Practice', type: 'swimming', color: HABIT_COLORS[1], target: '240 hours' },
+        { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[2], target: '6 books' }
       ],
       // Krishna's fitness and weight loss goals
       'Krishna Amar': [
-        { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0] },
-        { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1] },
-        { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2] }
+        { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0], target: '500 km' },
+        { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1], target: '10 books' },
+        { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2], target: '75 kg' }
       ],
       // Ritwik's career and social media goals
       'Ritwik Garg': [
-        { name: 'Job Search', type: 'job_search', color: HABIT_COLORS[0] },
-        { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[1] },
-        { name: 'Instagram Growth', type: 'instagram', color: HABIT_COLORS[2] }
+        { name: 'Job Search', type: 'job_search', color: HABIT_COLORS[0], target: '240 activities' },
+        { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[1], target: '96 topics' },
+        { name: 'Instagram Growth', type: 'instagram', color: HABIT_COLORS[2], target: '5000 followers' }
       ],
       // Legacy support for shorter names (backward compatibility)
       'Anuj': [
-        { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[0] },
-        { name: 'Gym 12 Times/Month', type: 'exercise', color: HABIT_COLORS[1] },
-        { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[2] }
+        { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[0], target: '6 books' },
+        { name: 'Gym 12 Times/Month', type: 'exercise', color: HABIT_COLORS[1], target: '144 sessions' },
+        { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[2], target: '96 topics' }
       ],
       'Suraj': [
-        { name: 'Half Marathon Training', type: 'running', color: HABIT_COLORS[0] },
-        { name: 'Swimming Practice', type: 'swimming', color: HABIT_COLORS[1] },
-        { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[2] }
+        { name: 'Half Marathon Training', type: 'running', color: HABIT_COLORS[0], target: '1200 km' },
+        { name: 'Swimming Practice', type: 'swimming', color: HABIT_COLORS[1], target: '240 hours' },
+        { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[2], target: '6 books' }
       ],
       'Amar': [
-        { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0] },
-        { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1] },
-        { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2] }
+        { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0], target: '500 km' },
+        { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1], target: '10 books' },
+        { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2], target: '75 kg' }
       ],
       'Krishna': [
-        { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0] },
-        { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1] },
-        { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2] }
+        { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0], target: '500 km' },
+        { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1], target: '10 books' },
+        { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2], target: '75 kg' }
       ],
       'Ritwik': [
-        { name: 'Job Search', type: 'job_search', color: HABIT_COLORS[0] },
-        { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[1] },
-        { name: 'Instagram Growth', type: 'instagram', color: HABIT_COLORS[2] }
+        { name: 'Job Search', type: 'job_search', color: HABIT_COLORS[0], target: '240 activities' },
+        { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[1], target: '96 topics' },
+        { name: 'Instagram Growth', type: 'instagram', color: HABIT_COLORS[2], target: '5000 followers' }
       ]
     };
 
@@ -111,7 +111,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             user_id: userId,
             name: habit.name,
             type: habit.type,
-            color: habit.color
+            color: habit.color,
+            target: habit.target
           }))
         );
 

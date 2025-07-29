@@ -165,15 +165,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
 
   const loadAllUserSummaries = async () => {
     try {
-      // Expected users - always show these 4 users
-      const expectedUsers = [
-        { name: 'Anuj Nawal', email: 'anuj@example.com' },
-        { name: 'Suraj Rarath', email: 'suraj@example.com' },
-        { name: 'Krishna Amar', email: 'krishna@example.com' },
-        { name: 'Ritwik Garg', email: 'ritwik@example.com' }
-      ];
-
-      // Get all users
+      // Get all registered users from database
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('*')
@@ -181,99 +173,79 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
 
       if (usersError) throw usersError;
 
-      const registeredUsers = users || [];
+      const allUsers = users || [];
       const summaries: UserSummary[] = [];
 
-      // Process each expected user
-      for (const expectedUser of expectedUsers) {
-        // Check if user is registered
-        const registeredUser = registeredUsers.find(u => u.name === expectedUser.name);
+      // Process each registered user
+      for (const user of allUsers) {
+        // Load user's habits
+        const { data: habits, error: habitsError } = await supabase
+          .from('habits')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (habitsError) throw habitsError;
+
+        // Get user's completions for the last 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        if (registeredUser) {
-          // User is registered - load their actual data
-          const { data: habits, error: habitsError } = await supabase
-            .from('habits')
-            .select('*')
-            .eq('user_id', registeredUser.id);
+        const { data: completions, error: completionsError } = await supabase
+          .from('habit_completions')
+          .select('*')
+          .eq('user_id', user.id)
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
 
-          if (habitsError) throw habitsError;
+        if (completionsError) throw completionsError;
 
-          // Get user's completions for the last 30 days
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // Get completions for the last 7 days
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const weeklyCompletions = completions?.filter(c => 
+          new Date(c.date) >= sevenDaysAgo
+        ) || [];
+
+        // Calculate monthly summaries for each habit
+        const habitMonthlySummaries = (habits || []).map(habit => 
+          calculateHabitMonthlyTotal(habit, completions || [])
+        );
+
+        // Calculate recent streak (meaningful completions per week)
+        const recentStreak = weeklyCompletions.filter(c => {
+          const data = c.data;
+          const habit = habits?.find(h => h.id === c.habit_id);
+          if (!habit) return false;
           
-          const { data: completions, error: completionsError } = await supabase
-            .from('habit_completions')
-            .select('*')
-            .eq('user_id', registeredUser.id)
-            .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+          // Count meaningful completions based on actual logged numbers
+          switch (habit.type) {
+            case 'book': return data.pages_read > 0;
+            case 'running': return data.kilometers > 0;
+            case 'ai_learning': return data.completed;
+            case 'job_search': return data.applied_for_job || data.sought_reference || data.updated_cv;
+            case 'swimming': return data.hours > 0;
+            case 'weight': return data.weight_kg > 0 || data.minutes > 0;
+            case 'exercise': return data.minutes > 0;
+            default: return false;
+          }
+        }).length;
 
-          if (completionsError) throw completionsError;
+        // Calculate current streak
+        const currentStreak = calculateStreak(completions || [], habits || []);
 
-          // Get completions for the last 7 days
-          const sevenDaysAgo = new Date();
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          
-          const weeklyCompletions = completions?.filter(c => 
-            new Date(c.date) >= sevenDaysAgo
-          ) || [];
-
-          // Calculate monthly summaries for each habit
-          const habitMonthlySummaries = (habits || []).map(habit => 
-            calculateHabitMonthlyTotal(habit, completions || [])
-          );
-
-          // Calculate recent streak (tasks per week)
-          const recentStreak = weeklyCompletions.filter(c => {
-            const data = c.data;
-            const habit = habits?.find(h => h.id === c.habit_id);
-            if (!habit) return false;
-            
-            // Count meaningful completions
-            switch (habit.type) {
-              case 'book': return data.pages_read > 0;
-              case 'running': return data.kilometers > 0;
-              case 'ai_learning': return data.completed;
-              case 'job_search': return data.applied_for_job || data.sought_reference || data.updated_cv;
-              case 'swimming': return data.hours > 0;
-              case 'weight': return data.weight_kg > 0;
-              case 'exercise': return data.minutes > 0;
-              default: return false;
-            }
-          }).length;
-
-          // Calculate current streak
-          const currentStreak = calculateStreak(completions || [], habits || []);
-
-          summaries.push({
-            user: {
-              id: registeredUser.id,
-              email: registeredUser.email,
-              name: registeredUser.name
-            },
-            habits: habits || [],
-            habitMonthlySummaries,
-            totalCompletions: completions?.length || 0,
-            weeklyCompletions: weeklyCompletions.length,
-            recentStreak,
-            currentStreak
-          });
-        } else {
-          // User not registered - create placeholder
-          summaries.push({
-            user: {
-              id: `placeholder-${expectedUser.name.toLowerCase().replace(' ', '-')}`,
-              email: expectedUser.email,
-              name: expectedUser.name
-            },
-            habits: [],
-            habitMonthlySummaries: [],
-            totalCompletions: 0,
-            weeklyCompletions: 0,
-            recentStreak: 0,
-            currentStreak: 0
-          });
-        }
+        summaries.push({
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name
+          },
+          habits: habits || [],
+          habitMonthlySummaries,
+          totalCompletions: completions?.length || 0,
+          weeklyCompletions: weeklyCompletions.length,
+          recentStreak,
+          currentStreak
+        });
       }
 
       setUserSummaries(summaries);
@@ -356,120 +328,101 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
             <div 
               key={summary.user.id} 
               className={`p-4 rounded-xl border-2 transition-all ${
-                summary.user.id.startsWith('placeholder-')
-                  ? 'border-gray-300 bg-gray-50'
-                  : summary.user.id === currentUser.id 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200 bg-white hover:border-gray-300'
+                summary.user.id === currentUser.id 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                    summary.user.id.startsWith('placeholder-')
-                      ? 'bg-gray-400'
-                      : 'bg-gradient-to-br from-blue-500 to-purple-600'
-                  }`}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-blue-500 to-purple-600">
                     {summary.user.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className={`text-sm font-semibold ${
-                      summary.user.id.startsWith('placeholder-') ? 'text-gray-600' : 'text-gray-900'
-                    }`}>
+                    <h3 className="text-sm font-semibold text-gray-900">
                       {summary.user.name}
                     </h3>
                     <p className="text-sm text-gray-600">
-                      {summary.user.id.startsWith('placeholder-') 
-                        ? '(Not registered)' 
-                        : `(${summary.habits.length} habits)`
-                      }
+                      ({summary.habits.length} habits)
                     </p>
                   </div>
                 </div>
-                {summary.user.id === currentUser.id && !summary.user.id.startsWith('placeholder-') && (
+                {summary.user.id === currentUser.id && (
                   <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                     You
                   </span>
                 )}
               </div>
 
-              {summary.user.id.startsWith('placeholder-') ? (
-                <div className="text-center py-4">
-                  <div className="text-gray-500 text-sm mb-2">User hasn't registered yet</div>
-                  <div className="text-xs text-gray-400">Default targets available once they join</div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <div className="text-lg font-bold text-blue-600">{summary.recentStreak}</div>
+                  <div className="text-sm text-gray-600">Recent streak (tasks/week)</div>
                 </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div className="text-center p-2 bg-gray-50 rounded-lg">
-                      <div className="text-lg font-bold text-blue-600">{summary.recentStreak}</div>
-                      <div className="text-sm text-gray-600">Recent streak (tasks/week)</div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-50 rounded-lg">
-                      <div className="flex items-center justify-center space-x-0.5">
-                        {getStreakIcon(summary.currentStreak)}
-                        <span className="text-lg font-bold text-gray-900">{summary.currentStreak}</span>
-                      </div>
-                      <div className="text-sm text-gray-600">Day Streak</div>
-                    </div>
+                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-center space-x-0.5">
+                    {getStreakIcon(summary.currentStreak)}
+                    <span className="text-lg font-bold text-gray-900">{summary.currentStreak}</span>
                   </div>
+                  <div className="text-sm text-gray-600">Day Streak</div>
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-gray-900">All Habits - This Month</h4>
-                    {summary.habitMonthlySummaries.length > 0 ? (
-                      summary.habitMonthlySummaries.map((habitSummary) => {
-                        const defaultTarget = getDefaultTarget(summary.user.name, habitSummary.habit.name);
-                        return (
-                          <div key={habitSummary.habit.id} className="p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <div 
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: habitSummary.habit.color }}
-                              />
-                              <span className="text-sm font-medium text-gray-900">{habitSummary.habit.name}</span>
-                              <div className="flex items-center space-x-1 ml-auto">
-                                {(['running', 'swimming', 'weight', 'exercise'].includes(habitSummary.habit.type)) && (
-                                  <button
-                                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                                    title="View Graph"
-                                  >
-                                    <LineChart className="w-3 h-3" />
-                                  </button>
-                                )}
-                                {habitSummary.habit.type === 'book' && (
-                                  <button
-                                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                                    title="View Book List"
-                                  >
-                                    <List className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            {defaultTarget && (
-                              <div className="text-xs text-gray-500 mb-1 ml-5">Target: {defaultTarget}</div>
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-gray-900">All Habits - This Month</h4>
+                {summary.habitMonthlySummaries.length > 0 ? (
+                  summary.habitMonthlySummaries.map((habitSummary) => {
+                    const defaultTarget = getDefaultTarget(summary.user.name, habitSummary.habit.name);
+                    const habitTarget = habitSummary.habit.target || defaultTarget;
+                    return (
+                      <div key={habitSummary.habit.id} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: habitSummary.habit.color }}
+                          />
+                          <span className="text-sm font-medium text-gray-900">{habitSummary.habit.name}</span>
+                          <div className="flex items-center space-x-1 ml-auto">
+                            {(['running', 'swimming', 'weight', 'exercise'].includes(habitSummary.habit.type)) && (
+                              <button
+                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="View Graph"
+                              >
+                                <LineChart className="w-3 h-3" />
+                              </button>
                             )}
-                            <div className="text-sm text-blue-600 font-bold ml-5">
-                              {habitSummary.monthlyTotal} {habitSummary.unit}
-                            </div>
+                            {habitSummary.habit.type === 'book' && (
+                              <button
+                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="View Book List"
+                              >
+                                <List className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
-                        );
-                      })
-                    ) : (
-                      <div className="text-xs text-gray-400 italic text-center py-2">
-                        No habits tracked yet
+                        </div>
+                        {habitTarget && (
+                          <div className="text-xs text-gray-500 mb-1 ml-5">Target: {habitTarget}</div>
+                        )}
+                        <div className="text-sm text-blue-600 font-bold ml-5">
+                          {habitSummary.monthlyTotal} {habitSummary.unit}
+                        </div>
                       </div>
-                    )}
+                    );
+                  })
+                ) : (
+                  <div className="text-xs text-gray-400 italic text-center py-2">
+                    No habits tracked yet
                   </div>
+                )}
+              </div>
 
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="flex justify-between text-sm text-gray-600">
-                      <span>This week: {summary.weeklyCompletions} completions</span>
-                      <span>Total: {summary.totalCompletions}</span>
-                    </div>
-                  </div>
-                </>
-              )}
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>This week: {summary.weeklyCompletions} completions</span>
+                  <span>Total: {summary.totalCompletions}</span>
+                </div>
+              </div>
             </div>
           ))}
         </div>

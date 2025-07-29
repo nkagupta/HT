@@ -19,6 +19,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [newHabit, setNewHabit] = useState({ 
     name: '', 
+    target: '',
     type: 'exercise' as HabitType, 
     color: HABIT_COLORS[0],
     custom_fields: [] as CustomField[]
@@ -74,7 +75,8 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
           user_id: currentUser.id,
           name: newHabit.name.trim(),
           type: newHabit.type,
-          color: newHabit.color
+          color: newHabit.color,
+          target: newHabit.target.trim() || null
         }])
         .select()
         .single();
@@ -83,6 +85,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
 
       setHabits([...habits, data]);
       setNewHabit({ name: '', type: 'exercise', color: HABIT_COLORS[0] });
+      setNewHabit({ name: '', target: '', type: 'exercise', color: HABIT_COLORS[0], custom_fields: [] });
       setShowAddCustom(false);
       showNotification('success', 'Habit added successfully!');
       setHasUnsavedChanges(false);
@@ -154,52 +157,52 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
   const addDefaultHabits = async () => {
     setAddingDefaults(true);
     try {
-      const defaultHabits: { [key: string]: Array<{ name: string; type: HabitType; color: string }> } = {
+      const defaultHabits: { [key: string]: Array<{ name: string; type: HabitType; color: string; target: string }> } = {
         'Anuj Nawal': [
-          { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[0] },
-          { name: 'Gym 12 Times/Month', type: 'exercise', color: HABIT_COLORS[1] },
-          { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[2] }
+          { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[0], target: '6 books' },
+          { name: 'Gym 12 Times/Month', type: 'exercise', color: HABIT_COLORS[1], target: '144 sessions' },
+          { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[2], target: '96 topics' }
         ],
         'Suraj Rarath': [
-          { name: 'Half Marathon Training', type: 'running', color: HABIT_COLORS[0] },
-          { name: 'Swimming Practice', type: 'swimming', color: HABIT_COLORS[1] },
-          { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[2] }
+          { name: 'Half Marathon Training', type: 'running', color: HABIT_COLORS[0], target: '1200 km' },
+          { name: 'Swimming Practice', type: 'swimming', color: HABIT_COLORS[1], target: '240 hours' },
+          { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[2], target: '6 books' }
         ],
         'Krishna Amar': [
-          { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0] },
-          { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1] },
-          { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2] }
+          { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0], target: '500 km' },
+          { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1], target: '10 books' },
+          { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2], target: '75 kg' }
         ],
         'Ritwik Garg': [
-          { name: 'Job Search', type: 'job_search', color: HABIT_COLORS[0] },
-          { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[1] },
-          { name: 'Instagram Growth', type: 'instagram', color: HABIT_COLORS[2] }
+          { name: 'Job Search', type: 'job_search', color: HABIT_COLORS[0], target: '240 activities' },
+          { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[1], target: '96 topics' },
+          { name: 'Instagram Growth', type: 'instagram', color: HABIT_COLORS[2], target: '5000 followers' }
         ],
         // Legacy support for shorter names
         'Anuj': [
-          { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[0] },
-          { name: 'Gym 12 Times/Month', type: 'exercise', color: HABIT_COLORS[1] },
-          { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[2] }
+          { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[0], target: '6 books' },
+          { name: 'Gym 12 Times/Month', type: 'exercise', color: HABIT_COLORS[1], target: '144 sessions' },
+          { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[2], target: '96 topics' }
         ],
         'Suraj': [
-          { name: 'Half Marathon Training', type: 'running', color: HABIT_COLORS[0] },
-          { name: 'Swimming Practice', type: 'swimming', color: HABIT_COLORS[1] },
-          { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[2] }
+          { name: 'Half Marathon Training', type: 'running', color: HABIT_COLORS[0], target: '1200 km' },
+          { name: 'Swimming Practice', type: 'swimming', color: HABIT_COLORS[1], target: '240 hours' },
+          { name: 'Read 6 Books', type: 'book', color: HABIT_COLORS[2], target: '6 books' }
         ],
         'Amar': [
-          { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0] },
-          { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1] },
-          { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2] }
+          { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0], target: '500 km' },
+          { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1], target: '10 books' },
+          { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2], target: '75 kg' }
         ],
         'Krishna': [
-          { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0] },
-          { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1] },
-          { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2] }
+          { name: 'Run 500km/Year', type: 'running', color: HABIT_COLORS[0], target: '500 km' },
+          { name: 'Read 10 Books', type: 'book', color: HABIT_COLORS[1], target: '10 books' },
+          { name: 'Weight Loss (10kg)', type: 'weight', color: HABIT_COLORS[2], target: '75 kg' }
         ],
         'Ritwik': [
-          { name: 'Job Search', type: 'job_search', color: HABIT_COLORS[0] },
-          { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[1] },
-          { name: 'Instagram Growth', type: 'instagram', color: HABIT_COLORS[2] }
+          { name: 'Job Search', type: 'job_search', color: HABIT_COLORS[0], target: '240 activities' },
+          { name: 'Learn AI', type: 'ai_learning', color: HABIT_COLORS[1], target: '96 topics' },
+          { name: 'Instagram Growth', type: 'instagram', color: HABIT_COLORS[2], target: '5000 followers' }
         ]
       };
 
@@ -241,7 +244,8 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
             user_id: currentUser.id,
             name: habit.name,
             type: habit.type,
-            color: habit.color
+            color: habit.color,
+            target: habit.target
           }))
         )
         .select();
@@ -361,6 +365,13 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
                 placeholder="Enter habit name (e.g., Morning Meditation)"
               />
+              <input
+                type="text"
+                value={newHabit.target}
+                onChange={(e) => setNewHabit({ ...newHabit, target: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+                placeholder="Enter yearly target (e.g., 10 books, 500 km, 75 kg)"
+              />
               <select
                 value={newHabit.type}
                 onChange={(e) => setNewHabit({ ...newHabit, type: e.target.value as HabitType })}
@@ -404,7 +415,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                   onClick={() => {
                     setShowAddCustom(false);
                     setShowCustomFields(false);
-                    setNewHabit({ name: '', type: 'exercise', color: HABIT_COLORS[0], custom_fields: [] });
+                    setNewHabit({ name: '', target: '', type: 'exercise', color: HABIT_COLORS[0], custom_fields: [] });
                   }}
                   className="px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation"
                 >
@@ -554,6 +565,21 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                     <p className="text-xs text-gray-500 mt-1">
                       {habitTypes.find(t => t.value === habit.type)?.description}
                     </p>
+                  </div>
+                  
+                  {/* Habit Target */}
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Yearly Target</label>
+                    <input
+                      type="text"
+                      value={habit.target || ''}
+                      onChange={(e) => {
+                        updateHabit(habit.id, { target: e.target.value || null });
+                        setHasUnsavedChanges(true);
+                      }}
+                      className="w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+                      placeholder="Enter yearly target (e.g., 10 books, 500 km, 75 kg)"
+                    />
                   </div>
                   
                   {/* Color Selection */}

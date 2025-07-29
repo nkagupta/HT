@@ -31,6 +31,7 @@ export interface Database {
           name: string;
           type: 'book' | 'running' | 'ai_learning' | 'job_search' | 'swimming' | 'weight' | 'exercise';
           color: string;
+          target: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -40,6 +41,7 @@ export interface Database {
           name: string;
           type: 'book' | 'running' | 'ai_learning' | 'job_search' | 'swimming' | 'weight' | 'exercise';
           color: string;
+          target?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -49,6 +51,7 @@ export interface Database {
           name?: string;
           type?: 'book' | 'running' | 'ai_learning' | 'job_search' | 'swimming' | 'weight' | 'exercise';
           color?: string;
+          target?: string | null;
           created_at?: string;
           updated_at?: string;
         };
