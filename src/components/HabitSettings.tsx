@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Edit, Save, X, Trash, Calendar, Download } from 'lucide-react';
+import { Settings, Plus, Edit, Save, X, Trash, Calendar, Download, Book } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { User, Habit, HabitCompletion, HabitType, getDateKey, isWithinFourteenDays, HABIT_COLORS } from '../utils/types';
 import HabitInput from './HabitInput';
@@ -10,13 +10,21 @@ interface HabitSettingsProps {
   onDataRefresh: () => void;
 }
 
+interface BookData {
+  id?: string;
+  title: string;
+  total_pages: number;
+}
+
 const HabitSettings: React.FC<HabitSettingsProps> = ({
   currentUser,
   onUnsavedChangesChange,
   onDataRefresh
 }) => {
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [books, setBooks] = useState<BookData[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showBookForm, setShowBookForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -26,6 +34,12 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
     type: 'book' as HabitType,
     color: HABIT_COLORS[0],
     target: ''
+  });
+
+  // Book form state
+  const [bookFormData, setBookFormData] = useState({
+    title: '',
+    total_pages: 0
   });
 
   // Entry management states
@@ -51,6 +65,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
 
   useEffect(() => {
     loadHabits();
+    loadBooks();
   }, [currentUser.id]);
 
   const loadHabits = async () => {
@@ -67,6 +82,21 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
       console.error('Error loading habits:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBooks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('books')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at');
+
+      if (error) throw error;
+      setBooks(data || []);
+    } catch (error) {
+      console.error('Error loading books:', error);
     }
   };
 
@@ -103,6 +133,35 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
     }
   };
 
+  const handleBookSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('books')
+        .insert([{
+          user_id: currentUser.id,
+          title: bookFormData.title,
+          total_pages: bookFormData.total_pages
+        }]);
+
+      if (error) throw error;
+
+      setBookFormData({
+        title: '',
+        total_pages: 0
+      });
+      setShowBookForm(false);
+      loadBooks();
+      onDataRefresh();
+    } catch (error) {
+      console.error('Error creating book:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteHabit = async (habitId: string) => {
     const confirmDelete = window.confirm('Are you sure you want to delete this habit? This will also delete all associated completion data.');
     if (!confirmDelete) return;
@@ -119,6 +178,25 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
       onDataRefresh();
     } catch (error) {
       console.error('Error deleting habit:', error);
+    }
+  };
+
+  const deleteBook = async (bookId: string) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this book?');
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('books')
+        .delete()
+        .eq('id', bookId);
+
+      if (error) throw error;
+      
+      loadBooks();
+      onDataRefresh();
+    } catch (error) {
+      console.error('Error deleting book:', error);
     }
   };
 
@@ -184,7 +262,6 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
     if (!window.confirm(confirmMessage)) return;
 
     try {
-      // Use habit_id, date, and user_id for deletion to handle multiple updates properly
       const { error } = await supabase
         .from('habit_completions')
         .delete()
@@ -418,7 +495,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
                   value={formData.target}
                   onChange={(e) => setFormData({ ...formData, target: e.target.value })}
                   className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="e.g., 3650 pages, 500 km, 50 topics"
+                  placeholder="e.g., 12 books, 500 km, 50 topics"
                 />
               </div>
 
@@ -508,6 +585,110 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
         </div>
       </div>
 
+      {/* Book Management for Reading Habits */}
+      {habits.some(habit => habit.type === 'book') && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
+              <Book className="w-5 h-5 text-blue-600" />
+              <span>My Books</span>
+            </h2>
+            <button
+              onClick={() => setShowBookForm(!showBookForm)}
+              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Book</span>
+            </button>
+          </div>
+
+          {/* Add Book Form */}
+          {showBookForm && (
+            <form onSubmit={handleBookSubmit} className="bg-blue-50 p-6 rounded-lg mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Book</h3>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Book Title</label>
+                  <input
+                    type="text"
+                    value={bookFormData.title}
+                    onChange={(e) => setBookFormData({ ...bookFormData, title: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="e.g., The Great Gatsby"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Total Pages</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={bookFormData.total_pages || ''}
+                    onChange={(e) => setBookFormData({ ...bookFormData, total_pages: parseInt(e.target.value) || 0 })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="e.g., 300"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {saving ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  <span>{saving ? 'Adding...' : 'Add Book'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBookForm(false)}
+                  className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Books List */}
+          <div className="space-y-3">
+            {books.length === 0 ? (
+              <div className="text-center py-6">
+                <Book className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                <h3 className="text-sm font-medium text-gray-900 mb-1">No Books Added</h3>
+                <p className="text-xs text-gray-600">Add books to track your reading progress and completion.</p>
+              </div>
+            ) : (
+              books.map(book => (
+                <div key={book.id} className="p-3 border border-blue-200 rounded-lg bg-blue-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900">{book.title}</h3>
+                      <p className="text-sm text-gray-600">{book.total_pages} pages</p>
+                    </div>
+                    <button
+                      onClick={() => deleteBook(book.id!)}
+                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                      title="Delete book"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Entry Management */}
       {habits.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-6">
@@ -579,10 +760,10 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
         <div className="bg-purple-50 p-4 rounded-lg">
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
             <Download className="w-5 h-5 text-purple-600" />
-            <span>Export Your Complete Data</span>
+            <span>Download Your Complete Data</span>
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Download a complete backup of all your habit data including habits, completions, and book records.
+            Download a complete backup of all your habit data including habits, completions, and book records in JSON format.
           </p>
           
           <button

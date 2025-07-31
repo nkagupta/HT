@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, ChevronLeft, ChevronRight, Info, X } from 'lucide-react';
 import { BarChart, Bar, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format, subDays, eachDayOfInterval, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from 'date-fns';
+import { format, subDays, eachDayOfInterval, startOfWeek, startOfMonth } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { User as UserType, UserProgress, CompetitionMetrics } from '../utils/types';
 
@@ -10,7 +10,7 @@ interface ChartsViewProps {
   dataRefreshKey?: number;
 }
 
-type TimePeriod = 'week' | 'month' | 'quarter' | 'year';
+type TimePeriod = 'week' | 'month';
 type ChartType = 'overview' | 'books' | 'exercise' | 'competition';
 
 interface ChartData {
@@ -32,16 +32,14 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
 
   const periods = [
     { value: 'week' as TimePeriod, label: 'This Week', days: 7 },
-    { value: 'month' as TimePeriod, label: 'This Month', days: 30 },
-    { value: 'quarter' as TimePeriod, label: 'This Quarter', days: 90 },
-    { value: 'year' as TimePeriod, label: 'This Year', days: 365 }
+    { value: 'month' as TimePeriod, label: 'This Month', days: 30 }
   ];
 
   const chartTypes = [
+    { value: 'overview' as ChartType, label: 'Daily Progress', icon: TrendingUp },
     { value: 'books' as ChartType, label: 'Reading Progress', icon: BookOpen },
     { value: 'exercise' as ChartType, label: 'Fitness Progress', icon: Activity },
-    { value: 'overview' as ChartType, label: 'Daily Progress', icon: TrendingUp },
-    { value: 'competition' as ChartType, label: 'Overall Ranking', icon: Users }
+    { value: 'competition' as ChartType, label: 'Competition', icon: Users }
   ];
 
   const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#F97316'];
@@ -63,14 +61,6 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
       case 'month':
         startDate = startOfMonth(currentDisplayDate);
         endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-        break;
-      case 'quarter':
-        startDate = startOfQuarter(currentDisplayDate);
-        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0);
-        break;
-      case 'year':
-        startDate = startOfYear(currentDisplayDate);
-        endDate = new Date(startDate.getFullYear(), 11, 31);
         break;
       default:
         startDate = startOfMonth(currentDisplayDate);
@@ -147,12 +137,8 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
         });
 
         const currentStreak = calculateUserStreak(userCompletions, userHabits);
-        const weeklyTotal = userCompletions.filter(c => {
-          const completionDate = new Date(c.date);
-          const weekAgo = new Date();
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          return completionDate >= weekAgo;
-        }).length;
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const weeklyTotal = userCompletions.filter(c => new Date(c.date) >= sevenDaysAgo).length;
 
         return {
           user: { id: user.id, email: user.email, name: user.name },
@@ -279,13 +265,11 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
       userProgressData.forEach((userProgress) => {
         const userName = userProgress.user.name.split(' ')[0];
         
-        // Get actual completions for this specific date
         const dateCompletions = userProgress.completions?.filter(c => c.date === dateKey) || [];
         let dayValue = 0;
 
         switch (selectedChart) {
           case 'overview':
-            // Calculate actual day total from completions for this specific date
             dateCompletions.forEach(completion => {
               const habit = userProgress.habits.find(h => h.id === completion.habit_id);
               if (habit) {
@@ -389,12 +373,6 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
       case 'month':
         newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
         break;
-      case 'quarter':
-        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 3 : -3));
-        break;
-      case 'year':
-        newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
-        break;
     }
     
     setCurrentDisplayDate(newDate);
@@ -405,84 +383,246 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
     
     switch (chartType) {
       case 'overview':
-        content = `**Daily Progress Trends**
+        content = `**Daily Progress Overview**
 
-This chart shows daily activity points across all your habits. Each data point represents the total progress logged on that specific day.
+This chart displays daily activity across all habit types, giving you a comprehensive view of everyone's progress.
 
 **How it's calculated:**
-• Books: Pages read per day
-• Running: Kilometers covered per day  
-• AI Learning: Topics completed per day (1 point each)
-• Job Search: Activities completed per day (applications, references, CV updates)
-• Swimming: Hours spent per day
-• Exercise/Weight: Minutes exercised per day
+• Each data point represents total daily activity
+• Books: Pages read that day
+• Running: Kilometers covered that day
+• AI Learning: Topics completed (1 point each)
+• Job Search: Activities completed (applications, references, CV updates)
+• Swimming: Hours spent swimming
+• Exercise/Weight: Minutes exercised
 
-**What the lines show:**
-• Each user gets a different colored line
-• Points only appear on days with actual logged activity
-• Gaps in lines indicate days with no recorded progress
-• Higher peaks show more productive days`;
+**Chart features:**
+• Each user has a unique colored line
+• Points only appear on days with logged activity
+• Gaps indicate days without progress
+• Compare productivity patterns across users`;
         break;
         
       case 'books':
         content = `**Reading Progress Chart**
 
-This chart specifically tracks daily reading progress, showing pages read per day for each user.
+Focused view showing daily reading activity for all users with book habits.
 
 **How it's calculated:**
-• Only data from book-type habits is included
-• Each point shows total pages read on that specific day
-• Multiple books can contribute to the same day's total
+• Only includes data from book-type habits
+• Shows pages read per day for each user
+• Multiple books can contribute to same day's total
+• Tracks consistent reading patterns
 
 **What to look for:**
-• Consistent daily reading creates steady lines
-• Missing points indicate days with no reading
-• Steep climbs show intensive reading sessions
-• Compare reading patterns between users`;
+• Steady lines indicate consistent daily reading
+• Gaps show days without reading activity
+• High peaks reveal intensive reading sessions
+• Compare reading dedication between users`;
         break;
         
       case 'exercise':
-        content = `**Fitness Progress Chart**
+        content = `**Fitness Activity Chart**
 
-This chart combines all fitness-related activities into daily totals.
+Combined view of all fitness-related activities including running, exercise, weight training, and swimming.
 
 **How it's calculated:**
-• Running: Kilometers covered (direct value)
+• Running: Direct kilometers value
 • Exercise: Minutes worked out
-• Weight tracking: Exercise minutes logged
-• Swimming: Hours converted to equivalent minutes (×60)
+• Weight Training: Exercise minutes logged
+• Swimming: Hours converted to minutes (×60)
+• All values combined into daily fitness totals
 
-**What the chart shows:**
-• Daily fitness activity across all exercise types
+**Insights:**
+• Shows overall fitness commitment patterns
 • Higher values indicate more intense workout days
-• Gaps show rest days or unlogged activities
-• Helps identify workout patterns and consistency`;
+• Gaps represent rest days or unlogged activities
+• Track fitness consistency across users`;
         break;
         
       case 'competition':
-        content = `**Overall Ranking & Leaderboard**
+        content = `**Competition Leaderboard**
 
-This view shows the competition standings based on total activity across all habit types.
+Modern leaderboard showing real-time rankings based on total activity across all habit types.
 
-**How rankings are calculated:**
-• All habit completions are converted to standardized points
-• Books: Pages read
-• Running: Kilometers
+**Ranking calculation:**
+• All habit completions converted to standardized points
+• Books: Pages read (higher value activities)
+• Running: Kilometers covered
 • AI Learning: Topics completed
 • Job Search: Activities completed
-• Exercise: Minutes
-• Swimming: Hours
+• Exercise: Minutes exercised
+• Swimming: Hours tracked
 
 **Leaderboard features:**
-• Rankings update in real-time
-• Total points determine position
-• Current streaks and weekly totals included
-• Shows who's most consistent across all habits`;
+• Live rankings update with each activity
+• Shows current week vs previous week performance
+• Displays total points and recent activity trends
+• Highlights top performers with special styling`;
         break;
     }
     
     setChartInfoContent(content);
     setShowChartInfoModal(true);
+  };
+
+  const renderModernCompetition = () => {
+    const sortedUsers = userProgress
+      .map(user => {
+        const totalPoints = Object.values(user.totalLogged).reduce((sum, val) => sum + val, 0);
+        const currentWeekPoints = user.weeklyTotal;
+        
+        // Calculate last week points (rough estimation)
+        const lastWeekPoints = Math.max(0, user.monthlyTotal - user.weeklyTotal);
+        
+        return {
+          ...user,
+          totalPoints,
+          currentWeekPoints,
+          lastWeekPoints,
+          trend: currentWeekPoints > lastWeekPoints ? 'up' : currentWeekPoints < lastWeekPoints ? 'down' : 'stable'
+        };
+      })
+      .sort((a, b) => b.totalPoints - a.totalPoints);
+
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Top 3 Podium */}
+          {sortedUsers.slice(0, 3).map((user, index) => (
+            <div key={user.user.id} className={`relative p-6 rounded-xl text-center ${
+              index === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-200 transform scale-105' :
+              index === 1 ? 'bg-gradient-to-br from-gray-100 to-gray-200' :
+              'bg-gradient-to-br from-orange-100 to-orange-200'
+            }`}>
+              <div className={`w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                index === 0 ? 'bg-gradient-to-br from-yellow-500 to-yellow-600' :
+                index === 1 ? 'bg-gradient-to-br from-gray-500 to-gray-600' :
+                'bg-gradient-to-br from-orange-500 to-orange-600'
+              }`}>
+                {index + 1}
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 mb-1">{user.user.name}</h3>
+              <div className="text-2xl font-bold text-gray-900 mb-2">{user.totalPoints}</div>
+              <div className="text-sm text-gray-600">total points</div>
+              
+              <div className="flex justify-between mt-4 text-xs">
+                <div className="text-center">
+                  <div className="font-semibold text-green-600">{user.currentWeekPoints}</div>
+                  <div className="text-gray-500">This Week</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-semibold text-blue-600">{user.lastWeekPoints}</div>
+                  <div className="text-gray-500">Last Week</div>
+                </div>
+              </div>
+              
+              {/* Trophy icon for winner */}
+              {index === 0 && (
+                <div className="absolute -top-2 -right-2">
+                  <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">🏆</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Detailed Rankings */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Complete Rankings</h3>
+          <div className="space-y-3">
+            {sortedUsers.map((user, index) => {
+              const isCurrentUser = user.user.id === currentUser.id;
+              
+              return (
+                <div key={user.user.id} className={`flex items-center justify-between p-4 rounded-lg transition-all ${
+                  isCurrentUser ? 'bg-blue-50 border-2 border-blue-200' : 'bg-gray-50 hover:bg-gray-100'
+                }`}>
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
+                      index < 3 ? 
+                        index === 0 ? 'bg-yellow-500' :
+                        index === 1 ? 'bg-gray-500' :
+                        'bg-orange-500'
+                      : 'bg-blue-500'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-gray-900">{user.user.name}</span>
+                        {isCurrentUser && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {user.habits.length} active habits
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <div className="text-xl font-bold text-gray-900">{user.totalPoints}</div>
+                    <div className="text-sm text-gray-500">points</div>
+                    
+                    {/* Trend indicator */}
+                    <div className={`text-xs mt-1 ${
+                      user.trend === 'up' ? 'text-green-600' :
+                      user.trend === 'down' ? 'text-red-600' :
+                      'text-gray-500'
+                    }`}>
+                      {user.trend === 'up' ? '↗ Trending Up' :
+                       user.trend === 'down' ? '↘ Trending Down' :
+                       '→ Stable'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Weekly Performance */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Performance</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium text-gray-900 mb-3">This Week's Top Performers</h4>
+              {sortedUsers
+                .sort((a, b) => b.currentWeekPoints - a.currentWeekPoints)
+                .slice(0, 3)
+                .map((user, index) => (
+                  <div key={user.user.id} className="flex items-center justify-between py-2">
+                    <span className="text-gray-700">{user.user.name}</span>
+                    <span className="font-semibold text-green-600">{user.currentWeekPoints} points</span>
+                  </div>
+                ))}
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-gray-900 mb-3">Biggest Improvers</h4>
+              {sortedUsers
+                .filter(user => user.currentWeekPoints > user.lastWeekPoints)
+                .sort((a, b) => (b.currentWeekPoints - b.lastWeekPoints) - (a.currentWeekPoints - a.lastWeekPoints))
+                .slice(0, 3)
+                .map((user, index) => (
+                  <div key={user.user.id} className="flex items-center justify-between py-2">
+                    <span className="text-gray-700">{user.user.name}</span>
+                    <span className="font-semibold text-blue-600">
+                      +{user.currentWeekPoints - user.lastWeekPoints} points
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderChart = () => {
@@ -515,55 +655,13 @@ This view shows the competition standings based on total activity across all hab
     const userNames = userProgress.map(up => up.user.name.split(' ')[0]);
 
     if (selectedChart === 'competition') {
-      const sortedUsers = userProgress.sort((a, b) => {
-        const aTotal = Object.values(a.totalLogged).reduce((sum, val) => sum + val, 0);
-        const bTotal = Object.values(b.totalLogged).reduce((sum, val) => sum + val, 0);
-        return bTotal - aTotal;
-      });
-
-      return (
-        <div className="space-y-4">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-semibold text-gray-900 mb-3">Competition Leaderboard</h4>
-            <div className="space-y-2">
-              {sortedUsers.map((user, index) => {
-                const total = Object.values(user.totalLogged).reduce((sum, val) => sum + val, 0);
-                const isCurrentUser = user.user.id === currentUser.id;
-                
-                return (
-                  <div key={user.user.id} className={`flex items-center justify-between p-3 rounded-lg ${
-                    isCurrentUser ? 'bg-blue-100' : 'bg-white'
-                  }`}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold ${
-                        index === 0 ? 'bg-yellow-500 text-white' :
-                        index === 1 ? 'bg-gray-400 text-white' :
-                        index === 2 ? 'bg-orange-600 text-white' :
-                        'bg-gray-200 text-gray-600'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <span className="font-medium">{user.user.name}</span>
-                      {isCurrentUser && <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">You</span>}
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-lg">{total}</div>
-                      <div className="text-xs text-gray-500">total points</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      );
+      return renderModernCompetition();
     }
 
     if (selectedChart === 'overview') {
       return (
         <div className="space-y-6">
           <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Daily Activity Trends</h4>
             <ResponsiveContainer width="100%" height={250}>
               <RechartsLineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -652,7 +750,7 @@ This view shows the competition standings based on total activity across all hab
       case 'exercise':
         return `Fitness Progress - ${periodLabel}`;
       case 'competition':
-        return `Competition Ranking - ${periodLabel}`;
+        return `Competition Leaderboard - ${periodLabel}`;
       default:
         return `Progress Chart - ${periodLabel}`;
     }
@@ -690,26 +788,27 @@ This view shows the competition standings based on total activity across all hab
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-900">Analytics Dashboard</h2>
+      {/* Modern Analytics Header */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900">Analytics Dashboard</h2>
           <div className="flex items-center space-x-1">
             <Calendar className="w-5 h-5 text-gray-400" />
             <span className="text-sm text-gray-600">{periods.find(p => p.value === selectedPeriod)?.label}</span>
           </div>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Time Period</label>
-          <div className="flex space-x-2 overflow-x-auto">
+        {/* Modern Time Period Selector */}
+        <div className="mb-6">
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
             {periods.map(period => (
               <button
                 key={period.value}
                 onClick={() => setSelectedPeriod(period.value)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
                   selectedPeriod === period.value
-                    ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white shadow-lg'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 {period.label}
@@ -718,34 +817,39 @@ This view shows the competition standings based on total activity across all hab
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Analytics View</label>
-          <div className="grid grid-cols-2 gap-2">
-            {chartTypes.map(type => {
-              const Icon = type.icon;
-              return (
-                <button
-                  key={type.value}
-                  onClick={() => setSelectedChart(type.value)}
-                  className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    selectedChart === type.value
-                      ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{type.label}</span>
-                </button>
-              );
-            })}
-          </div>
+        {/* Modern Chart Type Selector */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {chartTypes.map(type => {
+            const Icon = type.icon;
+            return (
+              <button
+                key={type.value}
+                onClick={() => setSelectedChart(type.value)}
+                className={`flex flex-col items-center space-y-2 p-4 rounded-xl transition-all ${
+                  selectedChart === type.value
+                    ? 'bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-200 shadow-md'
+                    : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                <Icon className={`w-6 h-6 ${
+                  selectedChart === type.value ? 'text-blue-600' : 'text-gray-600'
+                }`} />
+                <span className={`text-sm font-medium ${
+                  selectedChart === type.value ? 'text-blue-900' : 'text-gray-700'
+                }`}>
+                  {type.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4">
+      {/* Modern Chart Container */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <h3 className="text-base font-semibold text-gray-900">{getChartTitle()}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{getChartTitle()}</h3>
             <button
               onClick={() => showChartInfo(selectedChart)}
               className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
@@ -757,36 +861,35 @@ This view shows the competition standings based on total activity across all hab
           <Target className="w-5 h-5 text-green-500" />
         </div>
         
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => navigatePeriod('prev')}
-            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Previous</span>
-          </button>
-          
-          <div className="text-sm font-medium text-gray-700">
-            {selectedPeriod === 'week' ? 
-              format(currentDisplayDate, 'MMM dd, yyyy') :
-              selectedPeriod === 'month' ?
-              format(currentDisplayDate, 'MMMM yyyy') :
-              selectedPeriod === 'quarter' ?
-              `Q${Math.floor(currentDisplayDate.getMonth() / 3) + 1} ${currentDisplayDate.getFullYear()}` :
-              format(currentDisplayDate, 'yyyy')
-            }
+        {/* Navigation for non-competition charts */}
+        {selectedChart !== 'competition' && (
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => navigatePeriod('prev')}
+              className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </button>
+            
+            <div className="text-sm font-medium text-gray-700">
+              {selectedPeriod === 'week' ? 
+                format(currentDisplayDate, 'MMM dd, yyyy') :
+                format(currentDisplayDate, 'MMMM yyyy')
+              }
+            </div>
+            
+            <button
+              onClick={() => navigatePeriod('next')}
+              className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
-          
-          <button
-            onClick={() => navigatePeriod('next')}
-            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-          >
-            <span>Next</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+        )}
 
-        {chartData.length === 0 && !loading && !error && (
+        {chartData.length === 0 && !loading && !error && selectedChart !== 'competition' && (
           <div className="text-center py-8">
             <div className="text-gray-400 mb-2">
               <TrendingUp className="w-12 h-12 mx-auto" />
@@ -799,21 +902,26 @@ This view shows the competition standings based on total activity across all hab
         {renderChart()}
       </div>
 
-      {userProgress.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="text-base font-semibold text-gray-900 mb-3">🏆 Competition Highlights</h3>
-          <div className="space-y-2 text-sm text-gray-600">
-            <div>
-              📚 Most pages read: {Math.max(...userProgress.map(up => up.totalLogged.pages))} pages
+      {/* Summary Stats */}
+      {userProgress.length > 0 && selectedChart !== 'competition' && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Period Highlights</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="text-center p-3 bg-blue-50 rounded-lg">
+              <div className="text-xl font-bold text-blue-600">{Math.max(...userProgress.map(up => up.totalLogged.pages))}</div>
+              <div className="text-blue-800">Most Pages Read</div>
             </div>
-            <div>
-              🏃 Most kilometers covered: {Math.max(...userProgress.map(up => up.totalLogged.kilometers))} km
+            <div className="text-center p-3 bg-green-50 rounded-lg">
+              <div className="text-xl font-bold text-green-600">{Math.max(...userProgress.map(up => up.totalLogged.kilometers))}</div>
+              <div className="text-green-800">Most Kilometers</div>
             </div>
-            <div>
-              💪 Most exercise time: {Math.max(...userProgress.map(up => up.totalLogged.minutes))} minutes
+            <div className="text-center p-3 bg-purple-50 rounded-lg">
+              <div className="text-xl font-bold text-purple-600">{Math.max(...userProgress.map(up => up.totalLogged.minutes))}</div>
+              <div className="text-purple-800">Most Exercise Minutes</div>
             </div>
-            <div>
-              🔥 Longest streak: {Math.max(...userProgress.map(up => up.currentStreak))} days
+            <div className="text-center p-3 bg-orange-50 rounded-lg">
+              <div className="text-xl font-bold text-orange-600">{Math.max(...userProgress.map(up => up.currentStreak))}</div>
+              <div className="text-orange-800">Longest Streak</div>
             </div>
           </div>
         </div>

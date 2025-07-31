@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { Check, X } from 'lucide-react';
 import { Habit, HabitCompletionData, AI_TOPICS } from '../utils/types';
 
@@ -17,6 +18,29 @@ const HabitInput: React.FC<HabitInputProps> = ({
   onUpdate,
   disabled = false
 }) => {
+  const [availableBooks, setAvailableBooks] = useState<Array<{id: string, title: string}>>([]);
+
+  React.useEffect(() => {
+    if (habit.type === 'book') {
+      loadUserBooks();
+    }
+  }, [habit.type, habit.user_id]);
+
+  const loadUserBooks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('books')
+        .select('id, title')
+        .eq('user_id', habit.user_id)
+        .order('title');
+
+      if (error) throw error;
+      setAvailableBooks(data || []);
+    } catch (error) {
+      console.error('Error loading books:', error);
+    }
+  };
+
   const isWeightDay = date.getDay() === 0; // Sunday for weight tracking
 
   const renderInput = () => {
@@ -24,18 +48,26 @@ const HabitInput: React.FC<HabitInputProps> = ({
       case 'book':
         return (
           <div className="space-y-0.5">
-            <input
-              type="text"
+            <select
               value={(completion as any)?.book_title || ''}
-              onChange={(e) => onUpdate({
+              onChange={(e) => {
+                const selectedBook = availableBooks.find(book => book.title === e.target.value);
+                onUpdate({
                 pages_read: (completion as any)?.pages_read || 0,
                 book_title: e.target.value,
                 book_finished: (completion as any)?.book_finished
-              })}
+                });
+              }}
               className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
-              placeholder="Book Title"
               disabled={disabled}
-            />
+            >
+              <option value="">Select a book...</option>
+              {availableBooks.map(book => (
+                <option key={book.id} value={book.title}>
+                  {book.title}
+                </option>
+              ))}
+            </select>
             <input
               type="number"
               min="0"
