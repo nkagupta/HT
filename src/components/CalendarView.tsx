@@ -306,6 +306,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       // Clear pending changes
       setPendingChanges({});
       
+      // Trigger data refresh for other tabs
+      if (onDataRefresh) {
+        onDataRefresh();
+      }
+      
       // Show success feedback
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);

@@ -1,170 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Edit, Save, X, Trash, Calendar, Download, Book } from 'lucide-react';
+import { Habit } from '../utils/types';
 import { supabase } from '../lib/supabase';
-import { User, Habit, HabitCompletion, HabitType, getDateKey, isWithinFourteenDays, HABIT_COLORS } from '../utils/types';
-import HabitInput from './HabitInput';
+import { Trash2, Edit2, Save, X, Plus, Book } from 'lucide-react';
 
 interface HabitSettingsProps {
-  currentUser: User;
-  onUnsavedChangesChange: (hasChanges: boolean) => void;
-  onDataRefresh: () => void;
+  habits: Habit[];
+  onHabitsUpdate: () => void;
+  userId: string;
 }
 
-interface BookData {
-  id?: string;
+interface Book {
+  id: string;
+  user_id: string;
   title: string;
   total_pages: number;
+  finished_date: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-const HabitSettings: React.FC<HabitSettingsProps> = ({
-  currentUser,
-  onUnsavedChangesChange,
-  onDataRefresh
-}) => {
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [books, setBooks] = useState<BookData[]>([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showBookForm, setShowBookForm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  
-  // Form states
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'book' as HabitType,
-    color: HABIT_COLORS[0],
-    target: ''
-  });
+const HabitSettings: React.FC<HabitSettingsProps> = ({ habits, onHabitsUpdate, userId }) => {
+  const [editingHabit, setEditingHabit] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Habit>>({});
+  const [books, setBooks] = useState<Book[]>([]);
+  const [newBook, setNewBook] = useState({ title: '', total_pages: '' });
+  const [isAddingBook, setIsAddingBook] = useState(false);
 
-  // Book form state
-  const [bookFormData, setBookFormData] = useState({
-    title: '',
-    total_pages: 0
-  });
+  const habitTypes = [
+    'book', 'running', 'ai_learning', 'job_search', 
+    'swimming', 'weight', 'exercise'
+  ];
 
-  // Entry management states
-  const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
-  const [selectedDate, setSelectedDate] = useState('');
-  const [loadedEntry, setLoadedEntry] = useState<HabitCompletion | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<any>({});
-
-  // Export states
-  const [exporting, setExporting] = useState(false);
-
-  const habitTypes: { value: HabitType; label: string; description: string }[] = [
-    { value: 'book', label: '📚 Book Reading', description: 'Track pages read daily' },
-    { value: 'running', label: '🏃 Running', description: 'Track kilometers covered' },
-    { value: 'ai_learning', label: '🤖 AI Learning', description: 'Track AI topics studied' },
-    { value: 'job_search', label: '💼 Job Search', description: 'Track job applications and activities' },
-    { value: 'swimming', label: '🏊 Swimming', description: 'Track hours in the pool' },
-    { value: 'weight', label: '⚖️ Weight Tracking', description: 'Track weight and exercise' },
-    { value: 'exercise', label: '💪 Exercise', description: 'Track workout minutes' },
-    { value: 'instagram', label: '📱 Instagram Growth', description: 'Track follower count' }
+  const colorOptions = [
+    '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
+    '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
   ];
 
   useEffect(() => {
-    loadHabits();
-    loadBooks();
-  }, [currentUser.id]);
+    fetchBooks();
+  }, [userId]);
 
-  const loadHabits = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at');
-
-      if (error) throw error;
-      setHabits(data || []);
-    } catch (error) {
-      console.error('Error loading habits:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadBooks = async () => {
+  const fetchBooks = async () => {
     try {
       const { data, error } = await supabase
         .from('books')
         .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at');
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setBooks(data || []);
     } catch (error) {
-      console.error('Error loading books:', error);
+      console.error('Error fetching books:', error);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('habits')
-        .insert([{
-          user_id: currentUser.id,
-          name: formData.name,
-          type: formData.type,
-          color: formData.color,
-          target: formData.target || null
-        }]);
-
-      if (error) throw error;
-
-      setFormData({
-        name: '',
-        type: 'book',
-        color: HABIT_COLORS[0],
-        target: ''
-      });
-      setShowAddForm(false);
-      loadHabits();
-      onDataRefresh();
-    } catch (error) {
-      console.error('Error creating habit:', error);
-    } finally {
-      setSaving(false);
+  const handleDeleteHabit = async (habitId: string) => {
+    if (!confirm('Are you sure you want to delete this habit? This will also delete all related data.')) {
+      return;
     }
-  };
-
-  const handleBookSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('books')
-        .insert([{
-          user_id: currentUser.id,
-          title: bookFormData.title,
-          total_pages: bookFormData.total_pages
-        }]);
-
-      if (error) throw error;
-
-      setBookFormData({
-        title: '',
-        total_pages: 0
-      });
-      setShowBookForm(false);
-      loadBooks();
-      onDataRefresh();
-    } catch (error) {
-      console.error('Error creating book:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteHabit = async (habitId: string) => {
-    const confirmDelete = window.confirm('Are you sure you want to delete this habit? This will also delete all associated completion data.');
-    if (!confirmDelete) return;
 
     try {
       const { error } = await supabase
@@ -173,608 +67,344 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({
         .eq('id', habitId);
 
       if (error) throw error;
-      
-      loadHabits();
-      onDataRefresh();
+
+      onHabitsUpdate();
     } catch (error) {
       console.error('Error deleting habit:', error);
+      alert('Failed to delete habit');
     }
   };
 
-  const deleteBook = async (bookId: string) => {
-    const confirmDelete = window.confirm('Are you sure you want to delete this book?');
-    if (!confirmDelete) return;
+  const handleEditHabit = (habit: Habit) => {
+    setEditingHabit(habit.id);
+    setEditForm({
+      name: habit.name,
+      type: habit.type,
+      target: habit.target,
+      color: habit.color
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingHabit) return;
+
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({
+          name: editForm.name,
+          type: editForm.type,
+          target: editForm.target,
+          color: editForm.color,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingHabit);
+
+      if (error) throw error;
+
+      setEditingHabit(null);
+      setEditForm({});
+      onHabitsUpdate();
+    } catch (error) {
+      console.error('Error updating habit:', error);
+      alert('Failed to update habit');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingHabit(null);
+    setEditForm({});
+  };
+
+  const handleAddBook = async () => {
+    if (!newBook.title.trim() || !newBook.total_pages) {
+      alert('Please fill in all book details');
+      return;
+    }
+
+    const totalPages = parseInt(newBook.total_pages);
+    if (isNaN(totalPages) || totalPages <= 0) {
+      alert('Please enter a valid number of pages');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('books')
+        .insert({
+          user_id: userId,
+          title: newBook.title.trim(),
+          total_pages: totalPages
+        });
+
+      if (error) throw error;
+
+      setNewBook({ title: '', total_pages: '' });
+      setIsAddingBook(false);
+      fetchBooks();
+    } catch (error) {
+      console.error('Error adding book:', error);
+      alert('Failed to add book');
+    }
+  };
+
+  const handleDeleteBook = async (bookId: string) => {
+    if (!confirm('Are you sure you want to delete this book?')) {
+      return;
+    }
 
     try {
       const { error } = await supabase
         .from('books')
         .delete()
-        .eq('id', bookId);
+        .eq('id', bookId)
+        .eq('user_id', userId);
 
       if (error) throw error;
-      
-      loadBooks();
-      onDataRefresh();
+      fetchBooks();
     } catch (error) {
       console.error('Error deleting book:', error);
+      alert('Failed to delete book');
     }
   };
 
-  // Entry Management Functions
-  const handleLoadEntry = async () => {
-    if (!selectedHabit || !selectedDate) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('habit_completions')
-        .select('*')
-        .eq('habit_id', selectedHabit.id)
-        .eq('date', selectedDate)
-        .eq('user_id', currentUser.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      setLoadedEntry(data || null);
-    } catch (error) {
-      console.error('Error loading entry:', error);
-      setLoadedEntry(null);
+  const resetMobileViewport = () => {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      setTimeout(() => {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
+      }, 100);
     }
   };
-
-  const handleEditEntry = () => {
-    if (loadedEntry) {
-      setEditData(loadedEntry.data);
-      setIsEditing(true);
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    if (!loadedEntry) return;
-
-    try {
-      const { error } = await supabase
-        .from('habit_completions')
-        .update({ data: editData })
-        .eq('id', loadedEntry.id);
-
-      if (error) throw error;
-
-      const updatedEntry = { ...loadedEntry, data: editData };
-      setLoadedEntry(updatedEntry);
-      setIsEditing(false);
-      onDataRefresh();
-    } catch (error) {
-      console.error('Error updating entry:', error);
-    }
-  };
-
-  const handleDeleteEntry = async () => {
-    if (!loadedEntry || !selectedHabit) return;
-
-    const entryDate = new Date(selectedDate);
-    const canDelete = isWithinFourteenDays(entryDate);
-    
-    const confirmMessage = canDelete 
-      ? 'Are you sure you want to delete this entry?'
-      : 'This entry is older than 14 days. Are you sure you want to delete it? This action cannot be undone.';
-    
-    if (!window.confirm(confirmMessage)) return;
-
-    try {
-      const { error } = await supabase
-        .from('habit_completions')
-        .delete()
-        .eq('habit_id', selectedHabit.id)
-        .eq('date', selectedDate)
-        .eq('user_id', currentUser.id);
-
-      if (error) throw error;
-
-      setLoadedEntry(null);
-      setIsEditing(false);
-      onDataRefresh();
-    } catch (error) {
-      console.error('Error deleting entry:', error);
-    }
-  };
-
-  // Export Function
-  const exportUserData = async () => {
-    setExporting(true);
-    try {
-      const [habitsResult, completionsResult, booksResult] = await Promise.all([
-        supabase.from('habits').select('*').eq('user_id', currentUser.id),
-        supabase.from('habit_completions').select('*').eq('user_id', currentUser.id),
-        supabase.from('books').select('*').eq('user_id', currentUser.id)
-      ]);
-
-      const exportData = {
-        user: currentUser,
-        habits: habitsResult.data || [],
-        completions: completionsResult.data || [],
-        books: booksResult.data || [],
-        exported_at: new Date().toISOString(),
-        exported_by: currentUser.name
-      };
-
-      const dataStr = JSON.stringify(exportData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-      const exportFileDefaultName = `habitflow-${currentUser.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
-    } catch (error) {
-      console.error('Error exporting data:', error);
-      alert('Error exporting data. Please try again.');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const renderEntryData = () => {
-    if (!loadedEntry || !selectedHabit) return null;
-
-    const canEdit = isWithinFourteenDays(new Date(selectedDate));
-    const canDelete = isWithinFourteenDays(new Date(selectedDate));
-
-    if (isEditing && canEdit) {
-      return (
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-medium text-gray-900 mb-3">Edit Entry</h4>
-          <HabitInput
-            habit={selectedHabit}
-            date={new Date(selectedDate)}
-            completion={editData}
-            onUpdate={setEditData}
-          />
-          <div className="flex space-x-2 mt-4">
-            <button
-              onClick={handleSaveEdit}
-              className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-green-600 to-olive-600 text-white rounded-lg hover:from-green-700 hover:to-olive-700 text-sm"
-            >
-              <Save className="w-4 h-4" />
-              <span>Save</span>
-            </button>
-            <button
-              onClick={() => setIsEditing(false)}
-              className="flex items-center space-x-1 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
-            >
-              <X className="w-4 h-4" />
-              <span>Cancel</span>
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-gray-900">Entry Details</h4>
-          <div className="flex space-x-2">
-            {canEdit && (
-              <button
-                onClick={handleEditEntry}
-                className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-              >
-                <Edit className="w-4 h-4" />
-                <span>Edit</span>
-              </button>
-            )}
-            {canDelete && (
-              <button
-                onClick={handleDeleteEntry}
-                className="flex items-center space-x-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
-              >
-                <Trash className="w-4 h-4" />
-                <span>Delete</span>
-              </button>
-            )}
-          </div>
-        </div>
-        
-        <div className="space-y-2 text-sm">
-          {selectedHabit.type === 'book' && (
-            <>
-              {loadedEntry.data.book_title && <p><strong>Book:</strong> {loadedEntry.data.book_title}</p>}
-              <p><strong>Pages Read:</strong> {loadedEntry.data.pages_read || 0}</p>
-              {loadedEntry.data.book_finished && <p><strong>Status:</strong> Book Completed! 🎉</p>}
-            </>
-          )}
-          {selectedHabit.type === 'running' && (
-            <p><strong>Distance:</strong> {loadedEntry.data.kilometers || 0} km</p>
-          )}
-          {selectedHabit.type === 'ai_learning' && (
-            <>
-              {loadedEntry.data.topic && <p><strong>Topic:</strong> {loadedEntry.data.topic}</p>}
-              <p><strong>Status:</strong> {loadedEntry.data.completed ? 'Completed ✅' : 'In Progress'}</p>
-            </>
-          )}
-          {selectedHabit.type === 'job_search' && (
-            <div>
-              <p><strong>Activities:</strong></p>
-              <ul className="ml-4 mt-1">
-                {loadedEntry.data.applied_for_job && <li>• Applied for job</li>}
-                {loadedEntry.data.sought_reference && <li>• Sought reference</li>}
-                {loadedEntry.data.updated_cv && <li>• Updated CV</li>}
-              </ul>
-            </div>
-          )}
-          {selectedHabit.type === 'swimming' && (
-            <p><strong>Time:</strong> {loadedEntry.data.hours || 0} hours</p>
-          )}
-          {selectedHabit.type === 'weight' && (
-            <>
-              {loadedEntry.data.weight_kg > 0 && <p><strong>Weight:</strong> {loadedEntry.data.weight_kg} kg</p>}
-              {loadedEntry.data.minutes > 0 && <p><strong>Exercise:</strong> {loadedEntry.data.minutes} minutes</p>}
-            </>
-          )}
-          {selectedHabit.type === 'exercise' && (
-            <p><strong>Duration:</strong> {loadedEntry.data.minutes || 0} minutes</p>
-          )}
-          {selectedHabit.type === 'instagram' && (
-            <p><strong>Followers:</strong> {loadedEntry.data.followers || 0}</p>
-          )}
-        </div>
-
-        {!canEdit && !canDelete && (
-          <p className="text-xs text-gray-500 mt-3">
-            Entries older than 14 days have limited editing options.
-          </p>
-        )}
-      </div>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      {/* Habit Management */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-gray-900">My Habits</h2>
+      {/* My Habits Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">My Habits</h2>
+        
+        {habits.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">No habits found. Add some habits to get started!</p>
+        ) : (
+          <div className="space-y-4">
+            {habits.map((habit) => (
+              <div key={habit.id} className="border border-gray-200 rounded-lg p-4">
+                {editingHabit === habit.id ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Habit Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.name || ''}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          onFocus={resetMobileViewport}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Yearly Target
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.target || ''}
+                          onChange={(e) => setEditForm({ ...editForm, target: e.target.value })}
+                          placeholder="e.g., 12 books, 500 km"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          onFocus={resetMobileViewport}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Tracking Method
+                        </label>
+                        <select
+                          value={editForm.type || ''}
+                          onChange={(e) => setEditForm({ ...editForm, type: e.target.value as any })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          {habitTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Color
+                        </label>
+                        <div className="flex gap-2 flex-wrap">
+                          {colorOptions.map((color) => (
+                            <button
+                              key={color}
+                              onClick={() => setEditForm({ ...editForm, color })}
+                              className={`w-8 h-8 rounded-full border-2 ${
+                                editForm.color === color ? 'border-gray-600' : 'border-gray-300'
+                              }`}
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={handleSaveEdit}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-2"
+                      >
+                        <X className="w-4 h-4" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-6 h-6 rounded-full"
+                        style={{ backgroundColor: habit.color }}
+                      />
+                      <div>
+                        <h3 className="font-medium text-gray-800">{habit.name}</h3>
+                        <p className="text-sm text-gray-600">
+                          {habit.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          {habit.target && ` • Target: ${habit.target}`}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditHabit(habit)}
+                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                        title="Edit habit"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteHabit(habit.id)}
+                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md"
+                        title="Delete habit"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Book Management Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            <Book className="w-5 h-5" />
+            My Books
+          </h2>
           <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-600 to-olive-600 text-white rounded-lg hover:from-green-700 hover:to-olive-700 transition-colors"
+            onClick={() => setIsAddingBook(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Habit</span>
+            Add Book
           </button>
         </div>
 
-        {/* Add Habit Form */}
-        {showAddForm && (
-          <form onSubmit={handleSubmit} className="bg-gray-50 p-6 rounded-lg mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Habit</h3>
-            
-            <div className="grid grid-cols-1 gap-4">
+        {isAddingBook && (
+          <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Habit Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Book Title
+                </label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="e.g., Morning Reading"
-                  required
+                  value={newBook.title}
+                  onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
+                  placeholder="Enter book title"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onFocus={resetMobileViewport}
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Habit Type</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as HabitType })}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                >
-                  {habitTypes.map(type => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-sm text-gray-500 mt-1">
-                  {habitTypes.find(t => t.value === formData.type)?.description}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Annual Target (Optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Total Pages
+                </label>
                 <input
-                  type="text"
-                  value={formData.target}
-                  onChange={(e) => setFormData({ ...formData, target: e.target.value })}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="e.g., 12 books, 500 km, 50 topics"
+                  type="number"
+                  value={newBook.total_pages}
+                  onChange={(e) => setNewBook({ ...newBook, total_pages: e.target.value })}
+                  placeholder="Total pages"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onFocus={resetMobileViewport}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
-                <div className="flex space-x-2">
-                  {HABIT_COLORS.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, color })}
-                      className={`w-8 h-8 rounded-full border-2 ${
-                        formData.color === color ? 'border-black ring-2 ring-blue-500' : 'border-gray-300'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
               </div>
             </div>
-
-            <div className="flex space-x-3 mt-6">
+            <div className="flex gap-2 justify-end">
               <button
-                type="submit"
-                disabled={saving}
-                className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-green-600 to-olive-600 text-white rounded-lg hover:from-green-700 hover:to-olive-700 transition-colors disabled:opacity-50"
+                onClick={handleAddBook}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
-                {saving ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4" />
-                )}
-                <span>{saving ? 'Creating...' : 'Create Habit'}</span>
+                Add Book
               </button>
               <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                onClick={() => {
+                  setIsAddingBook(false);
+                  setNewBook({ title: '', total_pages: '' });
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
               >
                 Cancel
               </button>
             </div>
-          </form>
+          </div>
         )}
 
-        {/* Habits List */}
-        <div className="space-y-4">
-          {habits.length === 0 ? (
-            <div className="text-center py-8">
-              <Settings className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Habits Yet</h3>
-              <p className="text-gray-600">Get started by adding your first habit above.</p>
-            </div>
-          ) : (
-            habits.map(habit => (
-              <div key={habit.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: habit.color }}
-                    />
-                    <div>
-                      <h3 className="font-medium text-gray-900">{habit.name}</h3>
-                      <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <span className="capitalize">{habit.type.replace('_', ' ')}</span>
-                        {habit.target && (
-                          <>
-                            <span>•</span>
-                            <span>Target: {habit.target}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => deleteHabit(habit.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete habit"
-                  >
-                    <Trash className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Book Management for Reading Habits */}
-      {habits.some(habit => habit.type === 'book') && (
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
-              <Book className="w-5 h-5 text-blue-600" />
-              <span>My Books</span>
-            </h2>
-            <button
-              onClick={() => setShowBookForm(!showBookForm)}
-              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Book</span>
-            </button>
-          </div>
-
-          {/* Add Book Form */}
-          {showBookForm && (
-            <form onSubmit={handleBookSubmit} className="bg-blue-50 p-6 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Book</h3>
-              
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Book Title</label>
-                  <input
-                    type="text"
-                    value={bookFormData.title}
-                    onChange={(e) => setBookFormData({ ...bookFormData, title: e.target.value })}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    placeholder="e.g., The Great Gatsby"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Total Pages</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={bookFormData.total_pages || ''}
-                    onChange={(e) => setBookFormData({ ...bookFormData, total_pages: parseInt(e.target.value) || 0 })}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    placeholder="e.g., 300"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex space-x-3 mt-6">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-colors disabled:opacity-50"
-                >
-                  {saving ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4" />
-                  )}
-                  <span>{saving ? 'Adding...' : 'Add Book'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowBookForm(false)}
-                  className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Books List */}
+        {books.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">No books added yet. Add books to track your reading progress!</p>
+        ) : (
           <div className="space-y-3">
-            {books.length === 0 ? (
-              <div className="text-center py-6">
-                <Book className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                <h3 className="text-sm font-medium text-gray-900 mb-1">No Books Added</h3>
-                <p className="text-xs text-gray-600">Add books to track your reading progress and completion.</p>
-              </div>
-            ) : (
-              books.map(book => (
-                <div key={book.id} className="p-3 border border-blue-200 rounded-lg bg-blue-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{book.title}</h3>
-                      <p className="text-sm text-gray-600">{book.total_pages} pages</p>
-                    </div>
-                    <button
-                      onClick={() => deleteBook(book.id!)}
-                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                      title="Delete book"
-                    >
-                      <Trash className="w-4 h-4" />
-                    </button>
-                  </div>
+            {books.map((book) => (
+              <div key={book.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                <div>
+                  <h3 className="font-medium text-gray-800">{book.title}</h3>
+                  <p className="text-sm text-gray-600">{book.total_pages} pages</p>
+                  {book.finished_date && (
+                    <p className="text-sm text-green-600">
+                      Completed on {new Date(book.finished_date).toLocaleDateString()}
+                    </p>
+                  )}
                 </div>
-              ))
-            )}
+                <button
+                  onClick={() => handleDeleteBook(book.id)}
+                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md"
+                  title="Delete book"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
           </div>
-        </div>
-      )}
-
-      {/* Entry Management */}
-      {habits.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-6">Manage Entries</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select Habit</label>
-              <select
-                value={selectedHabit?.id || ''}
-                onChange={(e) => {
-                  const habit = habits.find(h => h.id === e.target.value);
-                  setSelectedHabit(habit || null);
-                  setLoadedEntry(null);
-                  setIsEditing(false);
-                }}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              >
-                <option value="">Choose a habit...</option>
-                {habits.map(habit => (
-                  <option key={habit.id} value={habit.id}>
-                    {habit.name} ({habit.type.replace('_', ' ')})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setLoadedEntry(null);
-                  setIsEditing(false);
-                }}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {selectedHabit && selectedDate && (
-            <div className="space-y-4">
-              <button
-                onClick={handleLoadEntry}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Calendar className="w-4 h-4" />
-                <span>Load Entry</span>
-              </button>
-
-              {loadedEntry === null && selectedHabit && selectedDate && (
-                <p className="text-gray-500 text-sm">
-                  No entry found for {selectedHabit.name} on {selectedDate}. Click "Load Entry" to check again.
-                </p>
-              )}
-
-              {loadedEntry && renderEntryData()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Data Download - Moved to bottom */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6">Data Download</h2>
-        
-        <div className="bg-purple-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-            <Download className="w-5 h-5 text-purple-600" />
-            <span>Download Your Complete Data</span>
-          </h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Download a complete backup of all your habit data including habits, completions, and book records in JSON format.
-          </p>
-          
-          <button
-            onClick={exportUserData}
-            disabled={exporting}
-            className="w-full flex items-center justify-center space-x-3 p-4 bg-gradient-to-r from-purple-600 to-purple-600 text-white rounded-lg hover:from-purple-700 hover:to-purple-700 transition-colors disabled:opacity-50"
-          >
-            <Download className="w-5 h-5" />
-            <span>{exporting ? 'Downloading...' : 'Download My Data'}</span>
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

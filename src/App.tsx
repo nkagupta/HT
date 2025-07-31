@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, LogOut, Info, X } from 'lucide-react';
+import { Calendar, LogOut, Info, X, User, BarChart3 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import LoginScreen from './components/LoginScreen';
 import CalendarView from './components/CalendarView';
 import HabitSettings from './components/HabitSettings';
 import SummaryView from './components/SummaryView';
 import ChartsView from './components/ChartsView';
+import PersonalProgressView from './components/PersonalProgressView';
 import { User as UserType } from './utils/types';
 
 /**
@@ -14,7 +15,7 @@ import { User as UserType } from './utils/types';
  */
 function App() {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
-  const [currentView, setCurrentView] = useState<'calendar' | 'settings' | 'summary' | 'charts'>('calendar');
+  const [currentView, setCurrentView] = useState<'calendar' | 'settings' | 'progress' | 'charts' | 'personal'>('calendar');
   const [loading, setLoading] = useState(true);
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const [settingsHaveUnsavedChanges, setSettingsHaveUnsavedChanges] = useState(false);
@@ -68,13 +69,22 @@ function App() {
     setShowHamburgerMenu(false);
   };
 
-  const handleViewChange = (newView: 'calendar' | 'settings' | 'summary' | 'charts') => {
+  const handleViewChange = (newView: 'calendar' | 'settings' | 'progress' | 'charts' | 'personal') => {
     if (currentView === 'settings' && settingsHaveUnsavedChanges) {
       const confirmLeave = window.confirm('You have unsaved changes in settings. Are you sure you want to leave?');
       if (!confirmLeave) return;
       setSettingsHaveUnsavedChanges(false);
     }
     setCurrentView(newView);
+    
+    // Fix mobile zoom issue - reset viewport
+    const metaViewport = document.querySelector('meta[name="viewport"]');
+    if (metaViewport) {
+      metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      setTimeout(() => {
+        metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
+      }, 100);
+    }
   };
 
   const getAppInfoContent = () => {
@@ -84,11 +94,13 @@ function App() {
 
 **📅 Calendar View**: Daily habit tracking interface where you can log progress for each of your habits. Track books (pages read), running (kilometers), AI learning (topics completed), job search activities, swimming (hours), weight tracking, exercise (minutes), and Instagram growth (followers).
 
-**📊 Analytics View**: Visual progress charts and data analysis with multiple time periods (week, month, quarter, year). View daily progress trends, reading competition, fitness competition, and overall ranking charts. Each chart shows real data points without artificial connections.
+**📊 Analytics View**: Visual progress charts and data analysis with multiple time periods (week, month). View daily progress trends, reading competition, fitness competition, and overall ranking charts. Each chart shows real data points without artificial connections.
 
 **🏆 Progress View**: Competition overview showing individual habit streaks, completion percentages toward annual goals, and rankings among all users. See detailed breakdowns of pages read, kilometers covered, exercise minutes, and other metrics.
 
-**⚙️ Settings View**: Comprehensive habit management including creating/deleting habits, managing historical entries (edit within 7 days, delete within 14 days), and data export functionality for backup purposes.
+**👤 Personal Progress**: Your individual habit analysis with detailed insights, trends, and personal achievement tracking across all your habits.
+
+**⚙️ Settings View**: Comprehensive habit management including creating/editing/deleting habits, managing historical entries (edit within 7 days, delete within 14 days), and data export functionality for backup purposes.
 
 **Key Features:**
 • 8 Different Habit Types with specialized tracking
@@ -104,8 +116,9 @@ function App() {
 1. Set up your habits in Settings with annual targets
 2. Track daily progress in Calendar view  
 3. Monitor trends and competition in Analytics
-4. Review achievements and streaks in Progress
-5. Manage habits and export data in Settings
+4. Review achievements and progress in Progress tabs
+5. Analyze personal performance in Personal Progress
+6. Manage habits and export data in Settings
 
 The app encourages consistency through visual progress tracking, friendly competition elements, and detailed analytics to help you build lasting habits over time.`;
   };
@@ -197,10 +210,10 @@ The app encourages consistency through visual progress tracking, friendly compet
 
         {/* Navigation Tabs - Keep black borders for header elements */}
         <div className="px-4 pb-4">
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-5 gap-1">
             <button
               onClick={() => handleViewChange('calendar')}
-              className={`flex items-center justify-center space-x-2 py-3 px-2 text-sm font-medium rounded-lg transition-all border-2 ${
+              className={`flex items-center justify-center space-x-1 py-3 px-1 text-xs font-medium rounded-lg transition-all border-2 ${
                 currentView === 'calendar' 
                   ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
@@ -212,22 +225,20 @@ The app encourages consistency through visual progress tracking, friendly compet
             
             <button
               onClick={() => handleViewChange('charts')}
-              className={`flex items-center justify-center space-x-2 py-3 px-2 text-sm font-medium rounded-lg transition-all border-2 ${
+              className={`flex items-center justify-center space-x-1 py-3 px-1 text-xs font-medium rounded-lg transition-all border-2 ${
                 currentView === 'charts' 
                   ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+              <BarChart3 className="w-4 h-4" />
               <span>Analytics</span>
             </button>
             
             <button
-              onClick={() => handleViewChange('summary')}
-              className={`flex items-center justify-center space-x-2 py-3 px-2 text-sm font-medium rounded-lg transition-all border-2 ${
-                currentView === 'summary' 
+              onClick={() => handleViewChange('progress')}
+              className={`flex items-center justify-center space-x-1 py-3 px-1 text-xs font-medium rounded-lg transition-all border-2 ${
+                currentView === 'progress' 
                   ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
@@ -237,10 +248,22 @@ The app encourages consistency through visual progress tracking, friendly compet
               </svg>
               <span>Progress</span>
             </button>
+
+            <button
+              onClick={() => handleViewChange('personal')}
+              className={`flex items-center justify-center space-x-1 py-3 px-1 text-xs font-medium rounded-lg transition-all border-2 ${
+                currentView === 'personal' 
+                  ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span>Personal</span>
+            </button>
             
             <button
               onClick={() => handleViewChange('settings')}
-              className={`flex items-center justify-center space-x-2 py-3 px-2 text-sm font-medium rounded-lg transition-all border-2 ${
+              className={`flex items-center justify-center space-x-1 py-3 px-1 text-xs font-medium rounded-lg transition-all border-2 ${
                 currentView === 'settings' 
                   ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
@@ -288,9 +311,10 @@ The app encourages consistency through visual progress tracking, friendly compet
 
       {/* Main Content */}
       <main className="px-4 py-4 max-w-md mx-auto">
-        {currentView === 'calendar' && <CalendarView currentUser={currentUser} />}
+        {currentView === 'calendar' && <CalendarView currentUser={currentUser} onDataRefresh={incrementDataRefreshKey} />}
         {currentView === 'charts' && <ChartsView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
-        {currentView === 'summary' && <SummaryView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
+        {currentView === 'progress' && <SummaryView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
+        {currentView === 'personal' && <PersonalProgressView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
         {currentView === 'settings' && (
           <HabitSettings
             currentUser={currentUser}

@@ -51,11 +51,9 @@ const HabitInput: React.FC<HabitInputProps> = ({
             <select
               value={(completion as any)?.book_title || ''}
               onChange={(e) => {
-                const selectedBook = availableBooks.find(book => book.title === e.target.value);
                 onUpdate({
-                pages_read: (completion as any)?.pages_read || 0,
-                book_title: e.target.value,
-                book_finished: (completion as any)?.book_finished
+                  ...((completion as any) || {}),
+                  book_title: e.target.value
                 });
               }}
               className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
@@ -73,9 +71,8 @@ const HabitInput: React.FC<HabitInputProps> = ({
               min="0"
               value={(completion as any)?.pages_read || ''}
               onChange={(e) => onUpdate({
-                pages_read: parseInt(e.target.value) || 0,
-                book_title: (completion as any)?.book_title || '',
-                book_finished: (completion as any)?.book_finished
+                ...((completion as any) || {}),
+                pages_read: parseInt(e.target.value) || 0
               })}
               className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
               placeholder="Pages"
@@ -86,8 +83,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
                 type="checkbox"
                 checked={(completion as any)?.book_finished || false}
                 onChange={(e) => onUpdate({
-                  pages_read: (completion as any)?.pages_read || 0,
-                  book_title: (completion as any)?.book_title || '',
+                  ...((completion as any) || {}),
                   book_finished: e.target.checked
                 })}
                 className="w-3 h-3 touch-manipulation"
