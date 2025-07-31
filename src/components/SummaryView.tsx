@@ -5,9 +5,10 @@ import { User as UserType, UserProgress } from '../utils/types';
 
 interface SummaryViewProps {
   currentUser: UserType;
+  dataRefreshKey?: number;
 }
 
-const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
+const SummaryView: React.FC<SummaryViewProps> = ({ currentUser, dataRefreshKey = 0 }) => {
   const [userSummaries, setUserSummaries] = useState<UserProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,53 +22,26 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
     setError(null);
     
     try {
-      // Step 1: Load ALL registered users
-      const { data: allUsers, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .order('name');
+      const [usersResult, habitsResult, completionsResult] = await Promise.all([
+        supabase.from('users').select('*').order('name'),
+        supabase.from('habits').select('*').order('created_at'),
+        supabase.from('habit_completions').select('*')
+          .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+          .order('date')
+      ]);
 
-      if (usersError) {
-        throw new Error(`Failed to load users: ${usersError.message}`);
-      }
+      if (usersResult.error) throw usersResult.error;
+      if (habitsResult.error) throw habitsResult.error;
+      if (completionsResult.error) throw completionsResult.error;
 
-      if (!allUsers || allUsers.length === 0) {
-        setUserSummaries([]);
-        return;
-      }
+      const allUsers = usersResult.data || [];
+      const allHabits = habitsResult.data || [];
+      const allCompletions = completionsResult.data || [];
 
-      // Step 2: Load habits for ALL users
-      const { data: allHabits, error: habitsError } = await supabase
-        .from('habits')
-        .select('*')
-        .order('created_at');
+      const processedSummaries: UserProgress[] = allUsers.map(user => {
+        const userHabits = allHabits.filter(h => h.user_id === user.id);
+        const userCompletions = allCompletions.filter(c => c.user_id === user.id);
 
-      if (habitsError) {
-        throw new Error(`Failed to load habits: ${habitsError.message}`);
-      }
-
-      // Step 3: Load completions for ALL users (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const { data: allCompletions, error: completionsError } = await supabase
-        .from('habit_completions')
-        .select('*')
-        .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
-        .order('date');
-
-      if (completionsError) {
-        throw new Error(`Failed to load completions: ${completionsError.message}`);
-      }
-
-      // Step 4: Process summary for each user
-      const processedSummaries: UserProgress[] = [];
-
-      for (const user of allUsers) {
-        const userHabits = (allHabits || []).filter(h => h.user_id === user.id);
-        const userCompletions = (allCompletions || []).filter(c => c.user_id === user.id);
-
-        // Calculate totals for this user across all habits
         const totalLogged = {
           pages: 0,
           kilometers: 0,
@@ -103,34 +77,23 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
             case 'exercise':
               totalLogged.minutes += completion.data.minutes || 0;
               break;
-            case 'instagram':
-              // Instagram doesn't contribute to main totals in this view
-              break;
           }
         });
 
-        // Calculate streak
         const currentStreak = calculateStreak(userCompletions, userHabits);
-        
-        // Weekly total
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const weeklyTotal = userCompletions.filter(c => 
-          new Date(c.date) >= sevenDaysAgo
-        ).length;
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const weeklyTotal = userCompletions.filter(c => new Date(c.date) >= sevenDaysAgo).length;
 
-        processedSummaries.push({
+        return {
           user: { id: user.id, email: user.email, name: user.name },
           habits: userHabits,
           totalLogged,
           currentStreak,
           weeklyTotal,
-          monthlyTotal: userCompletions.length,
-          allCompletions: userCompletions
-        });
-      }
+          monthlyTotal: userCompletions.length
+        };
+      });
 
-      // Sort by total activity (most active first)
       processedSummaries.sort((a, b) => {
         const aTotal = Object.values(a.totalLogged).reduce((sum, val) => sum + val, 0);
         const bTotal = Object.values(b.totalLogged).reduce((sum, val) => sum + val, 0);
@@ -150,14 +113,12 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
   const calculateStreak = (completions: any[], habits: any[]): number => {
     if (completions.length === 0 || habits.length === 0) return 0;
 
-    // Get unique dates with meaningful completions
     const completionDates = new Set(
       completions
         .filter(c => {
           const habit = habits.find(h => h.id === c.habit_id);
           if (!habit) return false;
           
-          // Check if completion has meaningful data
           switch (habit.type) {
             case 'book': return c.data.pages_read > 0;
             case 'running': return c.data.kilometers > 0;
@@ -193,75 +154,74 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
     return streak;
   };
 
-  const getStreakIcon = (streak: number) => {
-    if (streak >= 7) return <Award className="w-5 h-5 text-yellow-500" />;
-    if (streak >= 3) return <TrendingUp className="w-5 h-5 text-green-500" />;
-    return <Clock className="w-5 h-5 text-gray-400" />;
-  };
-
-  const getHabitSummary = (habit: any, completions: any[]): string => {
+  const calculateLikelihood = (habit: any, completions: any[]): number => {
     const habitCompletions = completions.filter(c => c.habit_id === habit.id);
     
-    if (habitCompletions.length === 0) return 'No activity';
+    if (habitCompletions.length === 0) return 0;
 
-    let total = 0;
-    let unit = '';
-
+    // Calculate current progress
+    let currentProgress = 0;
+    
     switch (habit.type) {
       case 'book':
-        total = habitCompletions.reduce((sum, c) => sum + (c.data.pages_read || 0), 0);
-        unit = 'pages';
+        currentProgress = habitCompletions.reduce((sum, c) => sum + (c.data.pages_read || 0), 0);
         break;
       case 'running':
-        total = habitCompletions.reduce((sum, c) => sum + (c.data.kilometers || 0), 0);
-        unit = 'km';
+        currentProgress = habitCompletions.reduce((sum, c) => sum + (c.data.kilometers || 0), 0);
         break;
       case 'ai_learning':
-        total = habitCompletions.filter(c => c.data.completed).length;
-        unit = 'topics';
+        currentProgress = habitCompletions.filter(c => c.data.completed).length;
         break;
       case 'job_search':
-        total = habitCompletions.reduce((sum, c) => {
+        currentProgress = habitCompletions.reduce((sum, c) => {
           return sum + (c.data.applied_for_job ? 1 : 0) + 
                       (c.data.sought_reference ? 1 : 0) + 
                       (c.data.updated_cv ? 1 : 0);
         }, 0);
-        unit = 'activities';
         break;
       case 'swimming':
-        total = habitCompletions.reduce((sum, c) => sum + (c.data.hours || 0), 0);
-        unit = 'hours';
+        currentProgress = habitCompletions.reduce((sum, c) => sum + (c.data.hours || 0), 0);
         break;
       case 'weight':
-        const latestWeight = habitCompletions
-          .filter(c => c.data.weight_kg > 0)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-        if (latestWeight) {
-          return `${latestWeight.data.weight_kg} kg (latest)`;
-        }
-        total = habitCompletions.reduce((sum, c) => sum + (c.data.minutes || 0), 0);
-        unit = 'exercise min';
-        break;
       case 'exercise':
-        total = habitCompletions.reduce((sum, c) => sum + (c.data.minutes || 0), 0);
-        unit = 'minutes';
+        currentProgress = habitCompletions.reduce((sum, c) => sum + (c.data.minutes || 0), 0);
         break;
       case 'instagram':
         const instagramData = habitCompletions
           .filter(c => c.data.followers > 0)
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         if (instagramData.length > 0) {
-          return `${instagramData[0].data.followers} followers`;
+          currentProgress = instagramData[0].data.followers;
         }
-        return 'No data';
+        break;
     }
 
-    return total > 0 ? `${Math.round(total * 10) / 10} ${unit}` : 'No activity';
+    // Calculate days since August 1, 2025
+    const startDate = new Date('2025-08-01');
+    const endDate = new Date('2026-07-31');
+    const currentDate = new Date();
+    
+    const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const elapsedDays = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (elapsedDays <= 0) return 50; // Before start date
+    
+    // Simple linear projection
+    const expectedProgress = (currentProgress / elapsedDays) * totalDays;
+    
+    // Extract target from habit.target string and compare
+    const targetMatch = habit.target?.match(/(\d+)/);
+    const targetValue = targetMatch ? parseInt(targetMatch[1]) : 1000; // Default fallback
+    
+    const likelihood = Math.min(100, Math.max(0, (expectedProgress / targetValue) * 100));
+    
+    return likelihood;
   };
 
-  const calculateLikelihood = (habit: any, completions: any[]): number => {
-    // Placeholder function - implement your likelihood calculation logic here
-    return Math.random() * 100;
+  const getStreakIcon = (streak: number) => {
+    if (streak >= 7) return <Award className="w-5 h-5 text-yellow-500" />;
+    if (streak >= 3) return <TrendingUp className="w-5 h-5 text-green-500" />;
+    return <Clock className="w-5 h-5 text-gray-400" />;
   };
 
   if (loading) {
@@ -292,11 +252,40 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
 
   return (
     <div className="space-y-4">
-      {/* Friend Competition Summary */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+      <div className="bg-white rounded-xl shadow-sm p-4 border-2 border-black">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-900">Friend Competition Summary</h2>
+          <h2 className="text-lg font-bold text-gray-900">Progress Overview</h2>
           <Calendar className="w-5 h-5 text-gray-400" />
+        </div>
+        
+        {/* Current Streaks Section - Moved from Charts */}
+        <div className="mb-6">
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span>Current Streaks</span>
+          </h3>
+          <div className="grid grid-cols-1 gap-2">
+            {userSummaries.map((summary) => (
+              <div key={summary.user.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-olive-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                    {summary.user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900">{summary.user.name}</div>
+                    <div className="text-xs text-gray-500">{summary.habits.length} habits</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center space-x-1">
+                    {getStreakIcon(summary.currentStreak)}
+                    <span className="text-lg font-bold text-gray-900">{summary.currentStreak}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">day streak</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
         
         <div className="grid grid-cols-1 gap-3">
@@ -309,51 +298,37 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
                 key={summary.user.id} 
                 className={`p-4 rounded-xl border-2 transition-all ${
                   index === 0 
-                    ? 'border-gradient-to-r from-yellow-400 to-yellow-600 bg-gradient-to-br from-yellow-50 to-yellow-100 shadow-lg'
+                    ? 'border-black bg-gradient-to-br from-yellow-50 to-yellow-100 shadow-xl'
                     : index === 1
-                    ? 'border-gradient-to-r from-gray-400 to-gray-600 bg-gradient-to-br from-gray-50 to-gray-100 shadow-md'
+                    ? 'border-black bg-gradient-to-br from-gray-50 to-gray-100 shadow-lg'
                     : index === 2
-                    ? 'border-gradient-to-r from-orange-400 to-orange-600 bg-gradient-to-br from-orange-50 to-orange-100 shadow-md'
+                    ? 'border-black bg-gradient-to-br from-green-50 to-olive-100 shadow-lg'
                     : isCurrentUser 
-                    ? 'border-blue-500 bg-blue-50 shadow-sm' 
-                    : 'border-gray-200 bg-white hover:border-gray-300'
+                    ? 'border-blue-600 bg-blue-50 shadow-md border-2' 
+                    : 'border-black bg-white hover:border-gray-600 shadow-sm'
                 }`}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                      index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-lg' :
-                      index === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-600 shadow-md' :
-                      index === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600 shadow-md' :
-                      'bg-gradient-to-br from-blue-500 to-purple-600'
+                      index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' :
+                      index === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-600' :
+                      index === 2 ? 'bg-gradient-to-br from-green-400 to-olive-600' :
+                      'bg-gradient-to-br from-blue-500 to-green-600'
                     }`}>
-                      {index < 3 ? (
-                        <span className="drop-shadow-sm">{index + 1}</span>
-                      ) : (
-                        summary.user.name.charAt(0).toUpperCase()
-                      )}
+                      {index < 3 ? (index + 1) : summary.user.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
                         <span>{summary.user.name}</span>
                         {isCurrentUser && (
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full shadow-sm">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                             You
                           </span>
                         )}
                         {index === 0 && (
-                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full shadow-sm">
+                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
                             🏆 Leader
-                          </span>
-                        )}
-                        {index === 1 && (
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-800 text-xs font-medium rounded-full shadow-sm">
-                            🥈 Second
-                          </span>
-                        )}
-                        {index === 2 && (
-                          <span className="px-2 py-0.5 bg-orange-100 text-orange-800 text-xs font-medium rounded-full shadow-sm">
-                            🥉 Third
                           </span>
                         )}
                       </h3>
@@ -364,66 +339,40 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
                   </div>
                 </div>
 
-                {/* Competition Stats */}
                 <div className="grid grid-cols-3 gap-2 mb-3">
-                  <div className={`text-center p-2 rounded-lg ${
-                    index === 0 ? 'bg-yellow-100' : 
-                    index === 1 ? 'bg-gray-100' : 
-                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
-                  }`}>
+                  <div className="text-center p-2 rounded-lg bg-gray-50 border border-black">
                     <div className="text-lg font-bold text-blue-600">{summary.totalLogged.pages}</div>
                     <div className="text-xs text-gray-600">Pages</div>
                   </div>
-                  <div className={`text-center p-2 rounded-lg ${
-                    index === 0 ? 'bg-yellow-100' : 
-                    index === 1 ? 'bg-gray-100' : 
-                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
-                  }`}>
+                  <div className="text-center p-2 rounded-lg bg-gray-50 border border-black">
                     <div className="text-lg font-bold text-green-600">{summary.totalLogged.kilometers}</div>
                     <div className="text-xs text-gray-600">Kilometers</div>
                   </div>
-                  <div className={`text-center p-2 rounded-lg ${
-                    index === 0 ? 'bg-yellow-100' : 
-                    index === 1 ? 'bg-gray-100' : 
-                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
-                  }`}>
-                    <div className="text-lg font-bold text-purple-600">{summary.totalLogged.minutes}</div>
+                  <div className="text-center p-2 rounded-lg bg-gray-50 border border-black">
+                    <div className="text-lg font-bold text-olive-600">{summary.totalLogged.minutes}</div>
                     <div className="text-xs text-gray-600">Minutes</div>
                   </div>
                 </div>
 
-                {/* Streak and Weekly Info */}
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  <div className={`text-center p-2 rounded-lg ${
-                    index === 0 ? 'bg-yellow-100' : 
-                    index === 1 ? 'bg-gray-100' : 
-                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
-                  }`}>
-                    <div className="flex items-center justify-center space-x-1">
-                      {getStreakIcon(summary.currentStreak)}
-                      <span className="text-lg font-bold text-gray-900">{summary.currentStreak}</span>
-                    </div>
-                    <div className="text-xs text-gray-600">Day Streak</div>
-                  </div>
-                  <div className={`text-center p-2 rounded-lg ${
-                    index === 0 ? 'bg-yellow-100' : 
-                    index === 1 ? 'bg-gray-100' : 
-                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
-                  }`}>
-                    <div className="text-lg font-bold text-orange-600">{summary.weeklyTotal}</div>
+                  <div className="text-center p-2 rounded-lg bg-gray-50 border border-black">
+                    <div className="text-lg font-bold text-green-600">{summary.weeklyTotal}</div>
                     <div className="text-xs text-gray-600">This Week</div>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-gray-50 border border-black">
+                    <div className="text-lg font-bold text-olive-600">{summary.monthlyTotal}</div>
+                    <div className="text-xs text-gray-600">This Month</div>
                   </div>
                 </div>
 
-                {/* Individual Habits */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-medium text-gray-900 uppercase tracking-wide">Individual Habits</h4>
+                  <h4 className="text-xs font-medium text-gray-900 uppercase tracking-wide">Habit Progress</h4>
                   {summary.habits.length > 0 ? (
                     summary.habits.map((habit) => {
                       const likelihood = calculateLikelihood(habit, (summary as any).allCompletions || []);
                       
                       return (
-                        <div key={habit.id} className="p-2 bg-gray-50 rounded-lg flex items-center justify-between">
+                        <div key={habit.id} className="p-2 bg-gray-50 rounded-lg flex items-center justify-between border border-black">
                           <div className="flex items-center space-x-2">
                             <div 
                               className="w-3 h-3 rounded-full"
@@ -435,17 +384,14 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
                             {habit.target && `Target: ${habit.target}`}
                           </div>
                           
-                          {/* Likelihood Button */}
                           <div 
-                            className="w-12 h-8 rounded-md flex items-center justify-center text-xs font-bold text-white shadow-sm"
+                            className="w-12 h-8 rounded-md flex items-center justify-center text-xs font-bold text-white shadow-sm border border-black"
                             style={{
-                              background: `linear-gradient(90deg, 
-                                ${likelihood < 50 ? 
-                                  `rgb(239, 68, 68) ${100-likelihood}%, rgb(34, 197, 94) ${likelihood}%` : 
-                                  `rgb(239, 68, 68) ${100-likelihood}%, rgb(34, 197, 94) ${likelihood}%`
-                                })`
+                              background: likelihood < 50 ? 
+                                `linear-gradient(90deg, rgb(239, 68, 68) ${100-likelihood}%, rgb(34, 197, 94) ${likelihood}%)` : 
+                                `linear-gradient(90deg, rgb(239, 68, 68) ${100-likelihood}%, rgb(34, 197, 94) ${likelihood}%)`
                             }}
-                            title={`${Math.round(likelihood)}% likely to complete by July 31, 2026`}
+                            title={`${Math.round(likelihood)}% progress toward annual goal`}
                           >
                             {Math.round(likelihood)}%
                           </div>
@@ -467,60 +413,8 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
       {userSummaries.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 text-center">
           <User className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-gray-900 mb-2">No Competition Data</h3>
-          <p className="text-sm text-gray-600">Start by setting up habits to compete with friends!</p>
-        </div>
-      )}
-
-      {/* Competition Insights */}
-      {userSummaries.length > 1 && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl shadow-sm p-4 border border-blue-200">
-          <h3 className="text-base font-semibold text-blue-900 mb-4 flex items-center space-x-2">
-            <span>🏆</span>
-            <span>Competition Highlights</span>
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-blue-200/50">
-              <div className="flex items-center space-x-2 mb-1">
-                <span className="text-lg">📚</span>
-                <span className="font-medium text-blue-900">Top Reader</span>
-              </div>
-              <div className="text-sm text-blue-800">
-                <span className="font-semibold">{userSummaries.sort((a, b) => b.totalLogged.pages - a.totalLogged.pages)[0]?.user.name.split(' ')[0]}</span>
-                <span className="text-blue-600"> - {Math.max(...userSummaries.map(u => u.totalLogged.pages))} pages</span>
-              </div>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-green-200/50">
-              <div className="flex items-center space-x-2 mb-1">
-                <span className="text-lg">🏃</span>
-                <span className="font-medium text-green-900">Top Runner</span>
-              </div>
-              <div className="text-sm text-green-800">
-                <span className="font-semibold">{userSummaries.sort((a, b) => b.totalLogged.kilometers - a.totalLogged.kilometers)[0]?.user.name.split(' ')[0]}</span>
-                <span className="text-green-600"> - {Math.max(...userSummaries.map(u => u.totalLogged.kilometers))} km</span>
-              </div>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-purple-200/50">
-              <div className="flex items-center space-x-2 mb-1">
-                <span className="text-lg">💪</span>
-                <span className="font-medium text-purple-900">Most Active</span>
-              </div>
-              <div className="text-sm text-purple-800">
-                <span className="font-semibold">{userSummaries.sort((a, b) => b.totalLogged.minutes - a.totalLogged.minutes)[0]?.user.name.split(' ')[0]}</span>
-                <span className="text-purple-600"> - {Math.max(...userSummaries.map(u => u.totalLogged.minutes))} minutes</span>
-              </div>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-orange-200/50">
-              <div className="flex items-center space-x-2 mb-1">
-                <span className="text-lg">🔥</span>
-                <span className="font-medium text-orange-900">Longest Streak</span>
-              </div>
-              <div className="text-sm text-orange-800">
-                <span className="font-semibold">{userSummaries.sort((a, b) => b.currentStreak - a.currentStreak)[0]?.user.name.split(' ')[0]}</span>
-                <span className="text-orange-600"> - {Math.max(...userSummaries.map(u => u.currentStreak))} days</span>
-              </div>
-            </div>
-          </div>
+          <h3 className="text-base font-semibold text-gray-900 mb-2">No Progress Data</h3>
+          <p className="text-sm text-gray-600">Start by setting up habits to track your progress!</p>
         </div>
       )}
     </div>

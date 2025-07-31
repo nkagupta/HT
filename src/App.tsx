@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Download, Upload, User, LogOut, Settings, AlertTriangle, Menu, X, Info } from 'lucide-react';
-import { BarChart } from 'lucide-react';
+import { Calendar, Download, Upload, User, LogOut, Settings, BarChart, Info, Users, ChevronDown } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import LoginScreen from './components/LoginScreen';
 import CalendarView from './components/CalendarView';
@@ -11,57 +10,39 @@ import { User as UserType } from './utils/types';
 
 /**
  * Main Application Component
- * 
- * This is the root component that manages the overall application state and routing.
- * It handles user authentication, navigation between different views, and data import/export functionality.
- * 
- * Features:
- * - User authentication with Supabase
- * - Navigation between Calendar, Summary, and Settings views
- * - Data export/import functionality for user habits and completions
- * - Responsive mobile-first design
+ * Redesigned with prominent header layout and hamburger menu
  */
 function App() {
-  // User authentication state
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
-  
-  // Current view state - determines which component to render
   const [currentView, setCurrentView] = useState<'calendar' | 'settings' | 'summary' | 'charts'>('calendar');
-  
-  // Current date for calendar navigation
-  const [currentDate] = useState(new Date());
-  
-  // Loading state for initial app load
   const [loading, setLoading] = useState(true);
-  
-  // Track unsaved changes in settings
-  const [settingsHaveUnsavedChanges, setSettingsHaveUnsavedChanges] = useState(false);
-  
-  // Data refresh key for forcing re-renders
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
-  
-  // Hamburger menu and about modal state
+  const [settingsHaveUnsavedChanges, setSettingsHaveUnsavedChanges] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
-  const [showAboutModal, setShowAboutModal] = useState(false);
-  
-  // Reference to hidden file input for data import
-  const [importFileRef] = useState<React.RefObject<HTMLInputElement>>(React.createRef());
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<UserType[]>([]);
+  const [selectedViewUser, setSelectedViewUser] = useState<UserType | null>(null);
 
-  // Function to increment data refresh key
-  const incrementDataRefreshKey = () => {
-    setDataRefreshKey(prev => prev + 1);
-  };
+  const incrementDataRefreshKey = () => setDataRefreshKey(prev => prev + 1);
 
   useEffect(() => {
-    /**
-     * Initialize application by checking for existing user session
-     * This runs once when the app loads to restore user login state
-     */
-    const checkUser = async () => {
-      // Get current user session from Supabase
+    checkUser();
+    loadAvailableUsers();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setCurrentUser(null);
+        setSelectedViewUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const checkUser = async () => {
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // If user is logged in, fetch their profile data
         const { data: userData } = await supabase
           .from('users')
           .select('*')
@@ -69,378 +50,289 @@ function App() {
           .single();
         
         if (userData) {
-          // Set user data in app state
-          setCurrentUser({
+          const userObj = {
             id: userData.id,
             email: userData.email,
             name: userData.name
-          });
+          };
+          setCurrentUser(userObj);
+          setSelectedViewUser(userObj); // Default to viewing own data
         }
       }
-      setLoading(false);
-    };
-    
-    checkUser();
-
-    // Set up listener for authentication state changes (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        setCurrentUser(null);
-      }
-    });
-
-    // Cleanup subscription on component unmount
-    return () => subscription.unsubscribe();
-  }, []);
-
-  /**
-   * Export all user data as JSON file
-   * Includes habits, completions, and books data
-   */
-  const exportData = async () => {
-    if (!currentUser) return;
-
-    try {
-      // Fetch all user habits
-      const { data: habits } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', currentUser.id);
-
-      // Fetch all habit completions
-      const { data: completions } = await supabase
-        .from('habit_completions')
-        .select('*')
-        .eq('user_id', currentUser.id);
-
-      // Fetch all books data
-      const { data: books } = await supabase
-        .from('books')
-        .select('*')
-        .eq('user_id', currentUser.id);
-
-      // Combine all data into export object
-      const exportData = {
-        user: currentUser,
-        habits: habits || [],
-        completions: completions || [],
-        books: books || [],
-        exported_at: new Date().toISOString()
-      };
-
-      // Convert to JSON and create download link
-      const dataStr = JSON.stringify(exportData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      // Generate filename with user name and date
-      const exportFileDefaultName = `habit-tracker-${currentUser.name}-${new Date().toISOString().split('T')[0]}.json`;
-      
-      // Trigger download
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
     } catch (error) {
-      console.error('Error exporting data:', error);
-      alert('Error exporting data. Please try again.');
+      console.error('Error checking user:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  /**
-   * Import user data from JSON file
-   * Validates data structure and imports habits, completions, and books
-   */
-  const importData = async (file: File) => {
+  const loadAvailableUsers = async () => {
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      // Validate that required data arrays exist
-      if (!data.habits || !Array.isArray(data.habits) ||
-          !data.completions || !Array.isArray(data.completions) ||
-          !data.books || !Array.isArray(data.books)) {
-        throw new Error('Invalid data format. Missing required arrays: habits, completions, books');
-      }
-
-      // Validate each habit has required fields
-      for (const habit of data.habits) {
-        if (!habit.name || !habit.type || !habit.color) {
-          throw new Error('Invalid habit structure. Each habit must have name, type, and color');
-        }
-      }
-
-      // Validate each completion has required fields
-      for (const completion of data.completions) {
-        if (!completion.habit_id || !completion.date || !completion.data) {
-          throw new Error('Invalid completion structure. Each completion must have habit_id, date, and data');
-        }
-      }
-
-      // Validate each book has required fields
-      for (const book of data.books) {
-        if (!book.title || typeof book.total_pages !== 'number') {
-          throw new Error('Invalid book structure. Each book must have title and total_pages');
-        }
-      }
-
-      let importedCount = 0;
-
-      // Import habits with upsert to handle duplicates
-      if (data.habits.length > 0) {
-        const { error: habitsError } = await supabase
-          .from('habits')
-          .upsert(
-            data.habits.map((habit: any) => ({
-              ...habit,
-              user_id: currentUser!.id
-            })),
-            { onConflict: 'id' }
-          );
-
-        if (habitsError) throw habitsError;
-        importedCount += data.habits.length;
-      }
-
-      // Import books with upsert to handle duplicates
-      if (data.books.length > 0) {
-        const { error: booksError } = await supabase
-          .from('books')
-          .upsert(
-            data.books.map((book: any) => ({
-              ...book,
-              user_id: currentUser!.id
-            })),
-            { onConflict: 'id' }
-          );
-
-        if (booksError) throw booksError;
-        importedCount += data.books.length;
-      }
-
-      // Import completions with upsert to handle duplicates
-      if (data.completions.length > 0) {
-        const { error: completionsError } = await supabase
-          .from('habit_completions')
-          .upsert(
-            data.completions.map((completion: any) => ({
-              ...completion,
-              user_id: currentUser!.id
-            })),
-            { onConflict: 'habit_id,date' }
-          );
-
-        if (completionsError) throw completionsError;
-        importedCount += data.completions.length;
-      }
-
-      alert(`Successfully imported ${importedCount} records!`);
+      const { data: users, error } = await supabase
+        .from('users')
+        .select('id, email, name')
+        .order('name');
       
-      // Clear the file input for future imports
-      if (importFileRef.current) {
-        importFileRef.current.value = '';
-      }
-      
-    } catch (error: any) {
-      console.error('Error importing data:', error);
-      alert(`Error importing data: ${error.message}`);
+      if (error) throw error;
+      setAvailableUsers(users || []);
+    } catch (error) {
+      console.error('Error loading users:', error);
     }
   };
 
-  /**
-   * Handle file selection for import
-   */
-  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      importData(file);
-    }
-  };
-
-  /**
-   * Log out current user and reset app state
-   */
   const logout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
+    setSelectedViewUser(null);
     setCurrentView('calendar');
+    setShowHamburgerMenu(false);
   };
 
-  /**
-   * Handle view changes with unsaved changes check
-   */
   const handleViewChange = (newView: 'calendar' | 'settings' | 'summary' | 'charts') => {
     if (currentView === 'settings' && settingsHaveUnsavedChanges) {
       const confirmLeave = window.confirm('You have unsaved changes in settings. Are you sure you want to leave?');
-      if (!confirmLeave) {
-        return;
-      }
-      // Reset unsaved changes state if user confirms
+      if (!confirmLeave) return;
       setSettingsHaveUnsavedChanges(false);
     }
     setCurrentView(newView);
   };
 
-  // Show loading spinner while checking authentication
+  const getPageInfoContent = () => {
+    switch (currentView) {
+      case 'calendar':
+        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
+      case 'charts':
+        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
+      case 'summary':
+        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
+      case 'settings':
+        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
+      default:
+        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
+    }
+  };
+
+  const switchToUser = (user: UserType) => {
+    setSelectedViewUser(user);
+    setShowHamburgerMenu(false);
+    incrementDataRefreshKey(); // Refresh data for the new user
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-green-50 to-olive-100 flex items-center justify-center px-4">
         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  // Show login screen if user is not authenticated
   if (!currentUser) {
     return <LoginScreen onLogin={setCurrentUser} />;
   }
 
-  // Main application interface
+  const displayUser = selectedViewUser || currentUser;
+  const isViewingOwnData = displayUser.id === currentUser.id;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pb-safe">
-      {/* Application Header with Navigation */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-        <div className="px-4 py-3">
-          {/* Top row with logo and action buttons */}
-          <div className="flex items-center justify-between mb-3">
-            {/* App logo and title */}
-            <button 
-              onClick={() => handleViewChange('calendar')}
-              className="flex items-center space-x-2 hover:opacity-75 transition-opacity touch-manipulation"
-            >
-              <Calendar className="w-6 h-6 text-blue-600" />
-              <h1 className="text-lg font-bold text-gray-900">Habit Tracker</h1>
-            </button>
-            
-            {/* Action buttons: Export, Import, Logout */}
-            <div className="flex items-center space-x-2">
-              {/* Export data button */}
-              <button
-                onClick={exportData}
-                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Export Data"
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-green-50 to-olive-100 pb-safe">
+      {/* Redesigned Header */}
+      <header className="bg-white shadow-lg border-b-2 border-black sticky top-0 z-40">
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between">
+            {/* Left Side - Website Name and User */}
+            <div className="flex-1">
+              <button 
+                onClick={() => handleViewChange('calendar')}
+                className="flex items-center space-x-3 hover:opacity-75 transition-opacity group"
               >
-                <Download className="w-5 h-5" />
-              </button>
-              
-              {/* Import data button */}
-              <button
-                onClick={() => importFileRef.current?.click()}
-                className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                title="Import Data"
-              >
-                <Upload className="w-5 h-5" />
-              </button>
-              
-              {/* Hidden file input for import */}
-              <input
-                ref={importFileRef}
-                type="file"
-                accept=".json"
-                onChange={handleImportFile}
-                className="hidden"
-              />
-              
-              {/* Logout button */}
-              <button
-                onClick={logout}
-                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-5 h-5" />
+                <Calendar className="w-8 h-8 text-blue-600 group-hover:scale-105 transition-transform" />
+                <div className="text-left">
+                  <h1 className="text-2xl font-bold text-gray-900 leading-tight">HabitFlow</h1>
+                  <div className="flex items-center space-x-2 text-sm">
+                    <User className="w-4 h-4 text-gray-600" />
+                    <span className="text-gray-700 font-medium">{currentUser.name}</span>
+                    {!isViewingOwnData && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full border border-black">
+                        Viewing {displayUser.name.split(' ')[0]}'s data
+                      </span>
+                    )}
+                  </div>
+                </div>
               </button>
             </div>
-          </div>
 
-          {/* User info display */}
-          <div className="flex items-center space-x-1 text-xs text-gray-600 mb-3">
-            <User className="w-3 h-3" />
-            <span>{currentUser.name}</span>
+            {/* Right Side - Hamburger Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
+                className="p-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border-2 border-black hover:border-blue-600"
+                title="Menu"
+              >
+                <div className="w-6 h-6 flex flex-col justify-center space-y-1">
+                  <div className={`w-full h-0.5 bg-current transition-transform ${showHamburgerMenu ? 'rotate-45 translate-y-2' : ''}`} />
+                  <div className={`w-full h-0.5 bg-current transition-opacity ${showHamburgerMenu ? 'opacity-0' : ''}`} />
+                  <div className={`w-full h-0.5 bg-current transition-transform ${showHamburgerMenu ? '-rotate-45 -translate-y-2' : ''}`} />
+                </div>
+              </button>
+
+              {/* Hamburger Menu Dropdown */}
+              {showHamburgerMenu && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border-2 border-black z-50">
+                  <div className="p-4 space-y-4">
+                    {/* Info Button */}
+                    <button
+                      onClick={() => {
+                        setShowInfoModal(true);
+                        setShowHamburgerMenu(false);
+                      }}
+                      className="w-full flex items-center space-x-3 p-4 text-left text-gray-700 hover:bg-blue-50 rounded-lg transition-colors border-2 border-black hover:border-blue-600"
+                    >
+                      <Info className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <div className="font-semibold">About HabitFlow</div>
+                        <div className="text-sm text-gray-500">Learn how the complete app works</div>
+                      </div>
+                    </button>
+
+                    {/* Logout */}
+                    <button
+                      onClick={logout}
+                      className="w-full flex items-center space-x-3 p-4 text-left text-red-700 hover:bg-red-50 rounded-lg transition-colors border-2 border-black hover:border-red-600"
+                    >
+                      <LogOut className="w-5 h-5 text-red-600" />
+                      <div>
+                        <div className="font-semibold">Sign Out</div>
+                        <div className="text-sm text-red-500">Logout from your account</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          
-          {/* Bottom navigation tabs */}
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="px-4 pb-4">
           <div className="grid grid-cols-4 gap-1">
-            {/* Calendar view tab */}
             <button
               onClick={() => handleViewChange('calendar')}
-              className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
+              className={`flex items-center justify-center space-x-2 py-3 px-2 text-sm font-medium rounded-lg transition-all border-2 ${
                 currentView === 'calendar' 
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
             >
-              <Calendar className="w-3 h-3" />
+              <Calendar className="w-4 h-4" />
               <span>Calendar</span>
             </button>
             
-            {/* Charts view tab */}
             <button
               onClick={() => handleViewChange('charts')}
-              className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
+              className={`flex items-center justify-center space-x-2 py-3 px-2 text-sm font-medium rounded-lg transition-all border-2 ${
                 currentView === 'charts' 
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
             >
-              <BarChart className="w-3 h-3" />
-              <span>Charts</span>
+              <BarChart className="w-4 h-4" />
+              <span>Analytics</span>
             </button>
             
-            {/* Summary view tab */}
             <button
               onClick={() => handleViewChange('summary')}
-              className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
+              className={`flex items-center justify-center space-x-2 py-3 px-2 text-sm font-medium rounded-lg transition-all border-2 ${
                 currentView === 'summary' 
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
             >
-              <User className="w-3 h-3" />
-              <span>Summary</span>
+              <User className="w-4 h-4" />
+              <span>Progress</span>
             </button>
             
-            {/* Settings view tab */}
             <button
               onClick={() => handleViewChange('settings')}
-              className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
+              className={`flex items-center justify-center space-x-2 py-3 px-2 text-sm font-medium rounded-lg transition-all border-2 ${
                 currentView === 'settings' 
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
             >
-              <Settings className="w-3 h-3" />
+              <Settings className="w-4 h-4" />
               <span>Settings</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content Area - renders different views based on current selection */}
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 border-2 border-black max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">About HabitFlow</h3>
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 border-2 border-black"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4 text-gray-600 leading-relaxed">
+              <p>{getPageInfoContent()}</p>
+              
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-900">Navigation Guide:</h4>
+                <ul className="space-y-2 text-sm">
+                  <li>• <strong>Calendar:</strong> Daily habit tracking and completion</li>
+                  <li>• <strong>Analytics:</strong> Visual progress charts and trends</li>
+                  <li>• <strong>Progress:</strong> Rankings, streaks, and competition overview</li>
+                  <li>• <strong>Settings:</strong> Manage habits, import/export data, edit entries</li>
+                </ul>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-900">Key Features:</h4>
+                <ul className="space-y-2 text-sm">
+                  <li>• <strong>Multi-User:</strong> View any user's progress (read-only)</li>
+                  <li>• <strong>8 Habit Types:</strong> Books, Running, AI Learning, Job Search, Swimming, Weight, Exercise, Instagram</li>
+                  <li>• <strong>Real-time Sync:</strong> All data updates instantly across views</li>
+                  <li>• <strong>Data Management:</strong> Export any user's data, import only your own</li>
+                  <li>• <strong>Smart Editing:</strong> Edit recent entries (7 days), manage older ones (14 days)</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="mt-6">
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-olive-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-olive-700 transition-colors border-2 border-black"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
       <main className="px-4 py-4 max-w-md mx-auto">
-        {/* Calendar View - Daily habit tracking */}
-        {currentView === 'calendar' && (
-          <CalendarView
-            currentUser={currentUser}
-            currentDate={currentDate}
-          />
-        )}
-        
-        {/* Charts View - Data visualization and progress tracking */}
-        {currentView === 'charts' && (
-          <ChartsView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />
-        )}
-        
-        {/* Summary View - Progress overview and statistics */}
-        {currentView === 'summary' && (
-          <SummaryView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />
-        )}
-        
-        {/* Settings View - Habit management */}
+        {currentView === 'calendar' && <CalendarView currentUser={displayUser} />}
+        {currentView === 'charts' && <ChartsView currentUser={displayUser} dataRefreshKey={dataRefreshKey} />}
+        {currentView === 'summary' && <SummaryView currentUser={displayUser} dataRefreshKey={dataRefreshKey} />}
         {currentView === 'settings' && (
           <HabitSettings
             currentUser={currentUser}
+            viewingUser={displayUser}
+            availableUsers={availableUsers}
+            isViewingOwnData={isViewingOwnData}
             onUnsavedChangesChange={setSettingsHaveUnsavedChanges}
             onDataRefresh={incrementDataRefreshKey}
-            onDataRefresh={incrementDataRefreshKey}
+            onUserSwitch={switchToUser}
           />
         )}
       </main>

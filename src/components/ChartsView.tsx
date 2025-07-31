@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, BarChart3, LineChart, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, subDays, eachDayOfInterval, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from 'date-fns';
 import { supabase } from '../lib/supabase';
@@ -18,7 +18,7 @@ interface ChartData {
   [key: string]: any;
 }
 
-const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) => {
+const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('month');
   const [selectedChart, setSelectedChart] = useState<ChartType>('overview');
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -44,61 +44,9 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
 
   const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#F97316'];
 
-  // Custom dot component for chart icons
-  const CustomDot = (props: any) => {
-    const { cx, cy, payload, dataKey } = props;
-    
-    // Only show icon on the last data point
-    if (payload && chartData && payload === chartData[chartData.length - 1]) {
-      let IconComponent = User; // Default icon
-      
-      // Determine icon based on chart type
-      if (selectedChart === 'books') {
-        IconComponent = BookOpen;
-      } else if (selectedChart === 'exercise') {
-        IconComponent = Activity;
-      }
-      
-      return (
-        <g>
-          <circle cx={cx} cy={cy} r={8} fill="white" stroke={props.stroke} strokeWidth={2} />
-          <foreignObject x={cx - 6} y={cy - 6} width={12} height={12}>
-            <div className="flex items-center justify-center w-full h-full">
-              <IconComponent className="w-3 h-3" style={{ color: props.stroke }} />
-            </div>
-          </foreignObject>
-        </g>
-      );
-    }
-    
-    // Regular small dot for other points
-    return <circle cx={cx} cy={cy} r={2} fill={props.stroke} />;
-  };
-
-  const navigatePeriod = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDisplayDate);
-    
-    switch (selectedPeriod) {
-      case 'week':
-        newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
-        break;
-      case 'month':
-        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
-        break;
-      case 'quarter':
-        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 3 : -3));
-        break;
-      case 'year':
-        newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
-        break;
-    }
-    
-    setCurrentDisplayDate(newDate);
-  };
-
   useEffect(() => {
     loadAllData();
-  }, [selectedPeriod, selectedChart, currentUser.id, dataRefreshKey]);
+  }, [selectedPeriod, selectedChart, currentUser.id, dataRefreshKey, currentDisplayDate]);
 
   const getDateRange = () => {
     let startDate: Date;
@@ -137,54 +85,27 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
     try {
       const { startDate, endDate } = getDateRange();
       
-      // Step 1: Load ALL users from the database
-      const { data: allUsers, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .order('name');
+      const [usersResult, habitsResult, completionsResult] = await Promise.all([
+        supabase.from('users').select('*').order('name'),
+        supabase.from('habits').select('*').order('created_at'),
+        supabase.from('habit_completions').select('*')
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0])
+          .order('date')
+      ]);
 
-      if (usersError) {
-        throw new Error(`Failed to load users: ${usersError.message}`);
-      }
+      if (usersResult.error) throw usersResult.error;
+      if (habitsResult.error) throw habitsResult.error;
+      if (completionsResult.error) throw completionsResult.error;
 
-      if (!allUsers || allUsers.length === 0) {
-        setUserProgress([]);
-        setCompetitionData([]);
-        setChartData([]);
-        return;
-      }
+      const allUsers = usersResult.data || [];
+      const allHabits = habitsResult.data || [];
+      const allCompletions = completionsResult.data || [];
 
-      // Step 2: Load habits for ALL users
-      const { data: allHabits, error: habitsError } = await supabase
-        .from('habits')
-        .select('*')
-        .order('created_at');
+      const processedUserProgress: UserProgress[] = allUsers.map(user => {
+        const userHabits = allHabits.filter(h => h.user_id === user.id);
+        const userCompletions = allCompletions.filter(c => c.user_id === user.id);
 
-      if (habitsError) {
-        throw new Error(`Failed to load habits: ${habitsError.message}`);
-      }
-
-      // Step 3: Load completions for ALL users within date range
-      const { data: allCompletions, error: completionsError } = await supabase
-        .from('habit_completions')
-        .select('*')
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0])
-        .order('date');
-
-      if (completionsError) {
-        throw new Error(`Failed to load completions: ${completionsError.message}`);
-      }
-
-      // Step 4: Process data for each user
-      const processedUserProgress: UserProgress[] = [];
-      const competitionMetrics: CompetitionMetrics[] = [];
-
-      for (const user of allUsers) {
-        const userHabits = (allHabits || []).filter(h => h.user_id === user.id);
-        const userCompletions = (allCompletions || []).filter(c => c.user_id === user.id);
-
-        // Calculate totals for this user
         const totalLogged = {
           pages: 0,
           kilometers: 0,
@@ -223,7 +144,6 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
           }
         });
 
-        // Calculate streaks and totals
         const currentStreak = calculateUserStreak(userCompletions, userHabits);
         const weeklyTotal = userCompletions.filter(c => {
           const completionDate = new Date(c.date);
@@ -232,49 +152,53 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
           return completionDate >= weekAgo;
         }).length;
 
-        processedUserProgress.push({
+        return {
           user: { id: user.id, email: user.email, name: user.name },
           habits: userHabits,
+          completions: userCompletions, // Add completions to user progress for chart data generation
           totalLogged,
           currentStreak,
           weeklyTotal,
           monthlyTotal: userCompletions.length
-        });
+        };
+      });
 
-        // Add to competition metrics
-        userHabits.forEach(habit => {
+      const competitionMetrics: CompetitionMetrics[] = [];
+      
+      processedUserProgress.forEach(userProgress => {
+        userProgress.habits.forEach(habit => {
           let value = 0;
           let unit = '';
           
           switch (habit.type) {
             case 'book':
-              value = totalLogged.pages;
+              value = userProgress.totalLogged.pages;
               unit = 'pages';
               break;
             case 'running':
-              value = totalLogged.kilometers;
+              value = userProgress.totalLogged.kilometers;
               unit = 'km';
               break;
             case 'ai_learning':
-              value = totalLogged.topics;
+              value = userProgress.totalLogged.topics;
               unit = 'topics';
               break;
             case 'job_search':
-              value = totalLogged.activities;
+              value = userProgress.totalLogged.activities;
               unit = 'activities';
               break;
             case 'swimming':
             case 'weight':
             case 'exercise':
-              value = totalLogged.minutes;
+              value = userProgress.totalLogged.minutes;
               unit = 'minutes';
               break;
           }
 
           if (value > 0) {
             competitionMetrics.push({
-              userId: user.id,
-              userName: user.name.split(' ')[0],
+              userId: userProgress.user.id,
+              userName: userProgress.user.name.split(' ')[0],
               habitType: habit.type,
               totalLogged: value,
               unit,
@@ -282,12 +206,11 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
             });
           }
         });
-      }
+      });
 
       setUserProgress(processedUserProgress);
       setCompetitionData(competitionMetrics);
 
-      // Generate chart data based on selected chart type
       const generatedChartData = generateChartData(processedUserProgress, startDate, endDate);
       setChartData(generatedChartData);
 
@@ -300,7 +223,6 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
   };
 
   const calculateUserStreak = (completions: any[], habits: any[]): number => {
-    // Simple streak calculation - days with any meaningful completion
     const completionDates = new Set(
       completions
         .filter(c => {
@@ -346,42 +268,132 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
     return intervals.map(date => {
       const dateKey = date.toISOString().split('T')[0];
       const dataPoint: ChartData = {
-        date: format(date, selectedPeriod === 'week' ? 'EEE' : 'MMM dd'),
+        date: format(date, selectedPeriod === 'week' ? 'EEE, MMM dd' : 'MMM dd'),
         dateKey
       };
 
       userProgressData.forEach((userProgress) => {
         const userName = userProgress.user.name.split(' ')[0];
+        
+        // Get actual completions for this specific date
+        const dateCompletions = userProgress.completions?.filter(c => c.date === dateKey) || [];
+        let dayValue = 0;
 
         switch (selectedChart) {
           case 'overview':
-            // Daily total logged numbers
-            const dayTotal = userProgress.totalLogged.pages + 
-                           userProgress.totalLogged.kilometers + 
-                           userProgress.totalLogged.minutes + 
-                           userProgress.totalLogged.topics + 
-                           userProgress.totalLogged.activities;
-            dataPoint[userName] = dayTotal;
+            // Calculate actual day total from completions for this specific date
+            dateCompletions.forEach(completion => {
+              const habit = userProgress.habits.find(h => h.id === completion.habit_id);
+              if (habit) {
+                switch (habit.type) {
+                  case 'book':
+                    dayValue += completion.data.pages_read || 0;
+                    break;
+                  case 'running':
+                    dayValue += completion.data.kilometers || 0;
+                    break;
+                  case 'ai_learning':
+                    dayValue += completion.data.completed ? 1 : 0;
+                    break;
+                  case 'job_search':
+                    dayValue += (completion.data.applied_for_job ? 1 : 0) + 
+                               (completion.data.sought_reference ? 1 : 0) + 
+                               (completion.data.updated_cv ? 1 : 0);
+                    break;
+                  case 'swimming':
+                    dayValue += (completion.data.hours || 0);
+                    break;
+                  case 'weight':
+                  case 'exercise':
+                    dayValue += completion.data.minutes || 0;
+                    break;
+                }
+              }
+            });
+            dataPoint[userName] = dayValue > 0 ? dayValue : undefined;
             break;
 
           case 'books':
-            dataPoint[userName] = userProgress.totalLogged.pages;
+            dateCompletions.forEach(completion => {
+              const habit = userProgress.habits.find(h => h.id === completion.habit_id);
+              if (habit && habit.type === 'book') {
+                dayValue += completion.data.pages_read || 0;
+              }
+            });
+            dataPoint[userName] = dayValue > 0 ? dayValue : undefined;
             break;
 
           case 'exercise':
-            const exerciseTotal = userProgress.totalLogged.kilometers + userProgress.totalLogged.minutes;
-            dataPoint[userName] = exerciseTotal;
+            dateCompletions.forEach(completion => {
+              const habit = userProgress.habits.find(h => h.id === completion.habit_id);
+              if (habit) {
+                if (habit.type === 'running') {
+                  dayValue += completion.data.kilometers || 0;
+                } else if (habit.type === 'exercise' || habit.type === 'weight' || habit.type === 'swimming') {
+                  dayValue += completion.data.minutes || (completion.data.hours || 0) * 60;
+                }
+              }
+            });
+            dataPoint[userName] = dayValue > 0 ? dayValue : undefined;
             break;
 
           case 'competition':
-            const competitionTotal = Object.values(userProgress.totalLogged).reduce((sum, val) => sum + val, 0);
-            dataPoint[userName] = competitionTotal;
+            dateCompletions.forEach(completion => {
+              const habit = userProgress.habits.find(h => h.id === completion.habit_id);
+              if (habit) {
+                switch (habit.type) {
+                  case 'book':
+                    dayValue += completion.data.pages_read || 0;
+                    break;
+                  case 'running':
+                    dayValue += completion.data.kilometers || 0;
+                    break;
+                  case 'ai_learning':
+                    dayValue += completion.data.completed ? 1 : 0;
+                    break;
+                  case 'job_search':
+                    dayValue += (completion.data.applied_for_job ? 1 : 0) + 
+                               (completion.data.sought_reference ? 1 : 0) + 
+                               (completion.data.updated_cv ? 1 : 0);
+                    break;
+                  case 'swimming':
+                    dayValue += (completion.data.hours || 0);
+                    break;
+                  case 'weight':
+                  case 'exercise':
+                    dayValue += completion.data.minutes || 0;
+                    break;
+                }
+              }
+            });
+            dataPoint[userName] = dayValue > 0 ? dayValue : undefined;
             break;
         }
       });
 
       return dataPoint;
     });
+  };
+
+  const navigatePeriod = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDisplayDate);
+    
+    switch (selectedPeriod) {
+      case 'week':
+        newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+        break;
+      case 'month':
+        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+        break;
+      case 'quarter':
+        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 3 : -3));
+        break;
+      case 'year':
+        newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
+        break;
+    }
+    
+    setCurrentDisplayDate(newDate);
   };
 
   const renderChart = () => {
@@ -414,7 +426,6 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
     const userNames = userProgress.map(up => up.user.name.split(' ')[0]);
 
     if (selectedChart === 'competition') {
-      // Show ranking table instead of chart
       const sortedUsers = userProgress.sort((a, b) => {
         const aTotal = Object.values(a.totalLogged).reduce((sum, val) => sum + val, 0);
         const bTotal = Object.values(b.totalLogged).reduce((sum, val) => sum + val, 0);
@@ -432,7 +443,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
                 
                 return (
                   <div key={user.user.id} className={`flex items-center justify-between p-3 rounded-lg ${
-                    isCurrentUser ? 'bg-blue-100 border-2 border-blue-300' : 'bg-white border border-gray-200'
+                    isCurrentUser ? 'bg-blue-100 border-2 border-blue-600' : 'bg-white border-2 border-black'
                   }`}>
                     <div className="flex items-center space-x-3">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -459,39 +470,20 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
       );
     }
 
-    // Streak Visualization for overview
     if (selectedChart === 'overview') {
       return (
         <div className="space-y-6">
-          {/* Streak Visualization */}
           <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Current Streaks</h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart
-                data={userProgress.map(up => ({
-                  name: up.user.name.split(' ')[0],
-                  streak: up.currentStreak
-                }))}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value, name) => [`${value} days`, 'Current Streak']} />
-                <Bar dataKey="streak" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          
-          {/* Daily Progress Line Chart */}
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Daily Progress Trends</h4>
+            <h4 className="font-semibold text-gray-900 mb-3">Daily Activity Trends</h4>
             <ResponsiveContainer width="100%" height={250}>
               <RechartsLineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`${value}`, 'Total Logged']} />
+                <Tooltip 
+                  formatter={(value) => value !== undefined ? [`${value}`, 'Activity Points'] : []} 
+                  labelFormatter={(label) => `Date: ${label}`}
+                />
                 <Legend />
                 {userProgress.map((up, index) => (
                   <Line
@@ -500,7 +492,8 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
                     dataKey={up.user.name.split(' ')[0]}
                     stroke={colors[index % colors.length]}
                     strokeWidth={1.5}
-                    dot={<CustomDot />}
+                    dot={{ r: 2 }}
+                    connectNulls={false}
                   />
                 ))}
               </RechartsLineChart>
@@ -510,14 +503,16 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
       );
     }
 
-    // Regular line charts for other types
     return (
       <ResponsiveContainer width="100%" height={300}>
         <RechartsLineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" />
           <YAxis />
-          <Tooltip formatter={(value) => [`${value}`, getTooltipLabel()]} />
+          <Tooltip 
+            formatter={(value) => value !== undefined ? [`${value}`, getTooltipLabel()] : []} 
+            labelFormatter={(label) => `Date: ${label}`}
+          />
           <Legend />
           {userNames.map((name, index) => (
             <Line
@@ -527,6 +522,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
               stroke={colors[index % colors.length]}
               strokeWidth={1.5}
               dot={{ r: 2 }}
+              connectNulls={false}
             />
           ))}
         </RechartsLineChart>
@@ -561,17 +557,15 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+      <div className="bg-white rounded-xl shadow-sm p-4 border-2 border-black">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-900">Friend Competition</h2>
+          <h2 className="text-lg font-bold text-gray-900">Analytics Dashboard</h2>
           <div className="flex items-center space-x-1">
             <Calendar className="w-5 h-5 text-gray-400" />
             <span className="text-sm text-gray-600">{periods.find(p => p.value === selectedPeriod)?.label}</span>
           </div>
         </div>
 
-        {/* Period Selection */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Time Period</label>
           <div className="flex space-x-2 overflow-x-auto">
@@ -579,10 +573,10 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
               <button
                 key={period.value}
                 onClick={() => setSelectedPeriod(period.value)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap border-2 ${
                   selectedPeriod === period.value
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
                 }`}
               >
                 {period.label}
@@ -591,9 +585,8 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
           </div>
         </div>
 
-        {/* Chart Type Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Competition View</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Analytics View</label>
           <div className="grid grid-cols-2 gap-2">
             {chartTypes.map(type => {
               const Icon = type.icon;
@@ -601,10 +594,10 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
                 <button
                   key={type.value}
                   onClick={() => setSelectedChart(type.value)}
-                  className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors border-2 ${
                     selectedChart === type.value
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -616,55 +609,56 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
         </div>
       </div>
 
-      {/* Chart Display */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+      <div className="bg-white rounded-xl shadow-sm p-4 border-2 border-black">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-900">{getChartTitle()}</h3>
           <Target className="w-5 h-5 text-green-500" />
         </div>
         
-        {/* Navigation Controls */}
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => navigatePeriod('prev')}
-            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors border-2 border-black hover:border-green-600"
           >
             <ChevronLeft className="w-4 h-4" />
             <span>Previous</span>
           </button>
           
           <div className="text-sm font-medium text-gray-700">
-            {selectedPeriod === 'week' 
-              ? format(getDateRange().startDate, 'MMM dd') + ' - ' + format(getDateRange().endDate, 'MMM dd, yyyy')
-              : format(currentDisplayDate, 'MMMM yyyy')
+            {selectedPeriod === 'week' ? 
+              format(currentDisplayDate, 'MMM dd, yyyy') :
+              selectedPeriod === 'month' ?
+              format(currentDisplayDate, 'MMMM yyyy') :
+              selectedPeriod === 'quarter' ?
+              `Q${Math.floor(currentDisplayDate.getMonth() / 3) + 1} ${currentDisplayDate.getFullYear()}` :
+              format(currentDisplayDate, 'yyyy')
             }
           </div>
           
           <button
             onClick={() => navigatePeriod('next')}
-            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors border-2 border-black hover:border-green-600"
           >
             <span>Next</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
-        {renderChart()}
-
         {chartData.length === 0 && !loading && !error && (
           <div className="text-center py-8">
             <div className="text-gray-400 mb-2">
               <TrendingUp className="w-12 h-12 mx-auto" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Competition Data</h3>
-            <p className="text-gray-600">Start tracking habits to compete with friends!</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Analytics Data</h3>
+            <p className="text-gray-600">Start tracking habits to see your progress analytics!</p>
           </div>
         )}
+
+        {renderChart()}
       </div>
 
-      {/* Competition Stats */}
       {userProgress.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+        <div className="bg-white rounded-xl shadow-sm p-4 border-2 border-black">
           <h3 className="text-base font-semibold text-gray-900 mb-3">🏆 Competition Highlights</h3>
           <div className="space-y-2 text-sm text-gray-600">
             <div>

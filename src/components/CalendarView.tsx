@@ -7,10 +7,12 @@ import HabitInput from './HabitInput';
 
 interface CalendarViewProps {
   currentUser: User;
+  currentDate?: Date;
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({
   currentUser,
+  currentDate: propCurrentDate,
 }) => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<{ [key: string]: HabitCompletion }>({});
@@ -32,8 +34,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     };
   } | null>(null);
   const [currentDate, setCurrentDate] = useState(() => {
-    const today = new Date();
-    return today;
+    return propCurrentDate || new Date();
   });
   
   const dateString = currentDate.toLocaleDateString('en-US', { 
@@ -549,18 +550,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       )}
       
       {/* Day Header */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+      <div className="bg-white rounded-xl shadow-sm p-4 border-2 border-black">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <button
               onClick={() => navigateDay('prev')}
-              className="p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors touch-manipulation"
+              className="p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors touch-manipulation border-2 border-black hover:border-green-600"
             >
               <ChevronLeft className="w-7 h-7" />
             </button>
             <button
               onClick={() => navigateDay('next')}
-              className="p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors touch-manipulation"
+              className="p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors touch-manipulation border-2 border-black hover:border-green-600"
             >
               <ChevronRight className="w-7 h-7" />
             </button>
@@ -569,7 +570,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             {!isToday && (
               <button
                 onClick={goToToday}
-                className="px-3 py-2 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-colors touch-manipulation"
+                className="px-3 py-2 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-colors touch-manipulation border-2 border-black hover:border-green-600"
               >
                 Today
               </button>
@@ -578,10 +579,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               <button
                 onClick={saveAllChanges}
                 disabled={!hasUnsavedChanges || saving}
-                className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-manipulation ${
+                className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-manipulation border-2 ${
                   hasUnsavedChanges
-                    ? 'bg-gradient-to-r from-green-600 to-lime-600 text-white hover:from-green-700 hover:to-lime-700'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    ? 'bg-gradient-to-r from-green-600 to-lime-600 text-white hover:from-green-700 hover:to-lime-700 border-black'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-400'
                 } ${saveSuccess ? 'bg-green-600 hover:bg-green-600' : ''}`}
               >
                 {saving ? (
@@ -599,7 +600,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             {/* Info Button - moved here */}
             <button
               onClick={() => setShowInfoModal(true)}
-              className="w-8 h-8 bg-gradient-to-br from-green-500 to-lime-500 bg-opacity-20 text-green-600 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors backdrop-blur-sm border border-green-200"
+              className="w-8 h-8 bg-gradient-to-br from-green-500 to-lime-500 bg-opacity-20 text-green-600 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors backdrop-blur-sm border-2 border-black hover:border-green-600"
               title="How to unlock celebrations"
             >
               <Info className="w-4 h-4" />
@@ -625,10 +626,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           {dayStats.map(({ habit, isCompleted, value }) => (
             <div
               key={habit.id}
-              className={`p-4 rounded-lg border-2 transition-all ${
+              className={`p-4 rounded-lg border-2 border-black transition-all ${
                 isCompleted 
-                  ? 'border-green-200 bg-green-50' 
-                  : 'border-gray-200 bg-white'
+                  ? 'border-green-600 bg-green-50 shadow-lg' 
+                  : 'border-black bg-white hover:border-gray-600'
               }`}
             >
               <div className="flex items-start justify-between mb-3">

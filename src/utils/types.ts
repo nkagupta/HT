@@ -128,6 +128,7 @@ export interface HabitCompletion {
 export interface UserProgress {
   user: User;
   habits: Habit[];
+  completions?: HabitCompletion[]; // Add completions for chart data generation
   totalLogged: {
     pages: number;
     kilometers: number;
