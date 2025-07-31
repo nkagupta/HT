@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Download, Upload, User, LogOut, Settings, BarChart, Info, Users, ChevronDown } from 'lucide-react';
+import { Calendar, LogOut, Info, X } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import LoginScreen from './components/LoginScreen';
 import CalendarView from './components/CalendarView';
@@ -20,19 +20,15 @@ function App() {
   const [settingsHaveUnsavedChanges, setSettingsHaveUnsavedChanges] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<UserType[]>([]);
-  const [selectedViewUser, setSelectedViewUser] = useState<UserType | null>(null);
 
   const incrementDataRefreshKey = () => setDataRefreshKey(prev => prev + 1);
 
   useEffect(() => {
     checkUser();
-    loadAvailableUsers();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         setCurrentUser(null);
-        setSelectedViewUser(null);
       }
     });
 
@@ -56,7 +52,6 @@ function App() {
             name: userData.name
           };
           setCurrentUser(userObj);
-          setSelectedViewUser(userObj); // Default to viewing own data
         }
       }
     } catch (error) {
@@ -66,24 +61,9 @@ function App() {
     }
   };
 
-  const loadAvailableUsers = async () => {
-    try {
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('id, email, name')
-        .order('name');
-      
-      if (error) throw error;
-      setAvailableUsers(users || []);
-    } catch (error) {
-      console.error('Error loading users:', error);
-    }
-  };
-
   const logout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
-    setSelectedViewUser(null);
     setCurrentView('calendar');
     setShowHamburgerMenu(false);
   };
@@ -97,25 +77,37 @@ function App() {
     setCurrentView(newView);
   };
 
-  const getPageInfoContent = () => {
-    switch (currentView) {
-      case 'calendar':
-        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
-      case 'charts':
-        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
-      case 'summary':
-        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
-      case 'settings':
-        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
-      default:
-        return 'HabitFlow is your comprehensive habit tracking companion. Navigate between Calendar (daily tracking), Analytics (progress visualization), Progress (competition overview), and Settings (habit management). Track reading, exercise, learning, and more with friends in a beautiful, intuitive interface. Data syncs across all views in real-time.';
-    }
-  };
+  const getAppInfoContent = () => {
+    return `HabitFlow is your comprehensive habit tracking companion designed for consistent daily progress and friendly competition.
 
-  const switchToUser = (user: UserType) => {
-    setSelectedViewUser(user);
-    setShowHamburgerMenu(false);
-    incrementDataRefreshKey(); // Refresh data for the new user
+**Complete Feature Overview:**
+
+**📅 Calendar View**: Daily habit tracking interface where you can log progress for each of your habits. Track books (pages read), running (kilometers), AI learning (topics completed), job search activities, swimming (hours), weight tracking, exercise (minutes), and Instagram growth (followers).
+
+**📊 Analytics View**: Visual progress charts and data analysis with multiple time periods (week, month, quarter, year). View daily progress trends, reading competition, fitness competition, and overall ranking charts. Each chart shows real data points without artificial connections.
+
+**🏆 Progress View**: Competition overview showing individual habit streaks, completion percentages toward annual goals, and rankings among all users. See detailed breakdowns of pages read, kilometers covered, exercise minutes, and other metrics.
+
+**⚙️ Settings View**: Comprehensive habit management including creating/deleting habits, managing historical entries (edit within 7 days, delete within 14 days), and data export functionality for backup purposes.
+
+**Key Features:**
+• 8 Different Habit Types with specialized tracking
+• Individual Habit Streaks and Progress Tracking  
+• Annual Goal Progress with Detailed Calculations
+• Real-time Data Synchronization Across All Views
+• Historical Entry Management with Time-based Permissions
+• Comprehensive Data Export for Backup and Analysis
+• Mobile-Optimized Interface with Touch-Friendly Controls
+• Secure User Authentication and Data Protection
+
+**How It Works:**
+1. Set up your habits in Settings with annual targets
+2. Track daily progress in Calendar view  
+3. Monitor trends and competition in Analytics
+4. Review achievements and streaks in Progress
+5. Manage habits and export data in Settings
+
+The app encourages consistency through visual progress tracking, friendly competition elements, and detailed analytics to help you build lasting habits over time.`;
   };
 
   if (loading) {
@@ -130,12 +122,9 @@ function App() {
     return <LoginScreen onLogin={setCurrentUser} />;
   }
 
-  const displayUser = selectedViewUser || currentUser;
-  const isViewingOwnData = displayUser.id === currentUser.id;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-green-50 to-olive-100 pb-safe">
-      {/* Redesigned Header */}
+      {/* Redesigned Header - Only place with black outlines */}
       <header className="bg-white shadow-lg border-b-2 border-black sticky top-0 z-40">
         <div className="px-4 py-4">
           <div className="flex items-center justify-between">
@@ -149,13 +138,7 @@ function App() {
                 <div className="text-left">
                   <h1 className="text-2xl font-bold text-gray-900 leading-tight">HabitFlow</h1>
                   <div className="flex items-center space-x-2 text-sm">
-                    <User className="w-4 h-4 text-gray-600" />
                     <span className="text-gray-700 font-medium">{currentUser.name}</span>
-                    {!isViewingOwnData && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full border border-black">
-                        Viewing {displayUser.name.split(' ')[0]}'s data
-                      </span>
-                    )}
                   </div>
                 </div>
               </button>
@@ -185,19 +168,19 @@ function App() {
                         setShowInfoModal(true);
                         setShowHamburgerMenu(false);
                       }}
-                      className="w-full flex items-center space-x-3 p-4 text-left text-gray-700 hover:bg-blue-50 rounded-lg transition-colors border-2 border-black hover:border-blue-600"
+                      className="w-full flex items-center space-x-3 p-4 text-left text-gray-700 hover:bg-blue-50 rounded-lg transition-colors"
                     >
                       <Info className="w-5 h-5 text-blue-600" />
                       <div>
                         <div className="font-semibold">About HabitFlow</div>
-                        <div className="text-sm text-gray-500">Learn how the complete app works</div>
+                        <div className="text-sm text-gray-500">Complete app functionality guide</div>
                       </div>
                     </button>
 
                     {/* Logout */}
                     <button
                       onClick={logout}
-                      className="w-full flex items-center space-x-3 p-4 text-left text-red-700 hover:bg-red-50 rounded-lg transition-colors border-2 border-black hover:border-red-600"
+                      className="w-full flex items-center space-x-3 p-4 text-left text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <LogOut className="w-5 h-5 text-red-600" />
                       <div>
@@ -212,7 +195,7 @@ function App() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs - Keep black borders for header elements */}
         <div className="px-4 pb-4">
           <div className="grid grid-cols-4 gap-1">
             <button
@@ -235,7 +218,9 @@ function App() {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
             >
-              <BarChart className="w-4 h-4" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
               <span>Analytics</span>
             </button>
             
@@ -247,7 +232,9 @@ function App() {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
             >
-              <User className="w-4 h-4" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
               <span>Progress</span>
             </button>
             
@@ -259,7 +246,10 @@ function App() {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
               }`}
             >
-              <Settings className="w-4 h-4" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
               <span>Settings</span>
             </button>
           </div>
@@ -269,48 +259,25 @@ function App() {
       {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 border-2 border-black max-h-96 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-96 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">About HabitFlow</h3>
+              <h3 className="text-xl font-bold text-gray-900">HabitFlow - Complete Guide</h3>
               <button
                 onClick={() => setShowInfoModal(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 border-2 border-black"
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="space-y-4 text-gray-600 leading-relaxed">
-              <p>{getPageInfoContent()}</p>
-              
-              <div className="space-y-3">
-                <h4 className="font-semibold text-gray-900">Navigation Guide:</h4>
-                <ul className="space-y-2 text-sm">
-                  <li>• <strong>Calendar:</strong> Daily habit tracking and completion</li>
-                  <li>• <strong>Analytics:</strong> Visual progress charts and trends</li>
-                  <li>• <strong>Progress:</strong> Rankings, streaks, and competition overview</li>
-                  <li>• <strong>Settings:</strong> Manage habits, import/export data, edit entries</li>
-                </ul>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="font-semibold text-gray-900">Key Features:</h4>
-                <ul className="space-y-2 text-sm">
-                  <li>• <strong>Multi-User:</strong> View any user's progress (read-only)</li>
-                  <li>• <strong>8 Habit Types:</strong> Books, Running, AI Learning, Job Search, Swimming, Weight, Exercise, Instagram</li>
-                  <li>• <strong>Real-time Sync:</strong> All data updates instantly across views</li>
-                  <li>• <strong>Data Management:</strong> Export any user's data, import only your own</li>
-                  <li>• <strong>Smart Editing:</strong> Edit recent entries (7 days), manage older ones (14 days)</li>
-                </ul>
-              </div>
+            <div className="text-gray-600 leading-relaxed whitespace-pre-line text-sm">
+              {getAppInfoContent()}
             </div>
             
             <div className="mt-6">
               <button
                 onClick={() => setShowInfoModal(false)}
-                className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-olive-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-olive-700 transition-colors border-2 border-black"
+                className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-olive-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-olive-700 transition-colors"
               >
                 Got it!
               </button>
@@ -321,18 +288,14 @@ function App() {
 
       {/* Main Content */}
       <main className="px-4 py-4 max-w-md mx-auto">
-        {currentView === 'calendar' && <CalendarView currentUser={displayUser} />}
-        {currentView === 'charts' && <ChartsView currentUser={displayUser} dataRefreshKey={dataRefreshKey} />}
-        {currentView === 'summary' && <SummaryView currentUser={displayUser} dataRefreshKey={dataRefreshKey} />}
+        {currentView === 'calendar' && <CalendarView currentUser={currentUser} />}
+        {currentView === 'charts' && <ChartsView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
+        {currentView === 'summary' && <SummaryView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
         {currentView === 'settings' && (
           <HabitSettings
             currentUser={currentUser}
-            viewingUser={displayUser}
-            availableUsers={availableUsers}
-            isViewingOwnData={isViewingOwnData}
             onUnsavedChangesChange={setSettingsHaveUnsavedChanges}
             onDataRefresh={incrementDataRefreshKey}
-            onUserSwitch={switchToUser}
           />
         )}
       </main>

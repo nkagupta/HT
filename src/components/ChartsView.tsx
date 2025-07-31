@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, ChevronLeft, ChevronRight, Info, X } from 'lucide-react';
 import { BarChart, Bar, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, subDays, eachDayOfInterval, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from 'date-fns';
 import { supabase } from '../lib/supabase';
@@ -27,6 +27,8 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentDisplayDate, setCurrentDisplayDate] = useState(new Date());
+  const [showChartInfoModal, setShowChartInfoModal] = useState(false);
+  const [chartInfoContent, setChartInfoContent] = useState('');
 
   const periods = [
     { value: 'week' as TimePeriod, label: 'This Week', days: 7 },
@@ -36,8 +38,8 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
   ];
 
   const chartTypes = [
-    { value: 'books' as ChartType, label: 'Reading Competition', icon: BookOpen },
-    { value: 'exercise' as ChartType, label: 'Fitness Competition', icon: Activity },
+    { value: 'books' as ChartType, label: 'Reading Progress', icon: BookOpen },
+    { value: 'exercise' as ChartType, label: 'Fitness Progress', icon: Activity },
     { value: 'overview' as ChartType, label: 'Daily Progress', icon: TrendingUp },
     { value: 'competition' as ChartType, label: 'Overall Ranking', icon: Users }
   ];
@@ -155,7 +157,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
         return {
           user: { id: user.id, email: user.email, name: user.name },
           habits: userHabits,
-          completions: userCompletions, // Add completions to user progress for chart data generation
+          completions: userCompletions,
           totalLogged,
           currentStreak,
           weeklyTotal,
@@ -268,7 +270,9 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
     return intervals.map(date => {
       const dateKey = date.toISOString().split('T')[0];
       const dataPoint: ChartData = {
-        date: format(date, selectedPeriod === 'week' ? 'EEE, MMM dd' : 'MMM dd'),
+        date: selectedPeriod === 'week' ? 
+          format(date, 'EEE') + '\n' + format(date, 'MMM dd') : 
+          format(date, selectedPeriod === 'month' ? 'MMM dd' : 'MMM dd'),
         dateKey
       };
 
@@ -396,6 +400,91 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
     setCurrentDisplayDate(newDate);
   };
 
+  const showChartInfo = (chartType: ChartType) => {
+    let content = '';
+    
+    switch (chartType) {
+      case 'overview':
+        content = `**Daily Progress Trends**
+
+This chart shows daily activity points across all your habits. Each data point represents the total progress logged on that specific day.
+
+**How it's calculated:**
+• Books: Pages read per day
+• Running: Kilometers covered per day  
+• AI Learning: Topics completed per day (1 point each)
+• Job Search: Activities completed per day (applications, references, CV updates)
+• Swimming: Hours spent per day
+• Exercise/Weight: Minutes exercised per day
+
+**What the lines show:**
+• Each user gets a different colored line
+• Points only appear on days with actual logged activity
+• Gaps in lines indicate days with no recorded progress
+• Higher peaks show more productive days`;
+        break;
+        
+      case 'books':
+        content = `**Reading Progress Chart**
+
+This chart specifically tracks daily reading progress, showing pages read per day for each user.
+
+**How it's calculated:**
+• Only data from book-type habits is included
+• Each point shows total pages read on that specific day
+• Multiple books can contribute to the same day's total
+
+**What to look for:**
+• Consistent daily reading creates steady lines
+• Missing points indicate days with no reading
+• Steep climbs show intensive reading sessions
+• Compare reading patterns between users`;
+        break;
+        
+      case 'exercise':
+        content = `**Fitness Progress Chart**
+
+This chart combines all fitness-related activities into daily totals.
+
+**How it's calculated:**
+• Running: Kilometers covered (direct value)
+• Exercise: Minutes worked out
+• Weight tracking: Exercise minutes logged
+• Swimming: Hours converted to equivalent minutes (×60)
+
+**What the chart shows:**
+• Daily fitness activity across all exercise types
+• Higher values indicate more intense workout days
+• Gaps show rest days or unlogged activities
+• Helps identify workout patterns and consistency`;
+        break;
+        
+      case 'competition':
+        content = `**Overall Ranking & Leaderboard**
+
+This view shows the competition standings based on total activity across all habit types.
+
+**How rankings are calculated:**
+• All habit completions are converted to standardized points
+• Books: Pages read
+• Running: Kilometers
+• AI Learning: Topics completed
+• Job Search: Activities completed
+• Exercise: Minutes
+• Swimming: Hours
+
+**Leaderboard features:**
+• Rankings update in real-time
+• Total points determine position
+• Current streaks and weekly totals included
+• Shows who's most consistent across all habits`;
+        break;
+    }
+    
+    setChartInfoContent(content);
+    setShowChartInfoModal(true);
+  };
+
   const renderChart = () => {
     if (loading) {
       return (
@@ -435,7 +524,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
       return (
         <div className="space-y-4">
           <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-semibold text-gray-900 mb-3">Friend Competition Leaderboard</h4>
+            <h4 className="font-semibold text-gray-900 mb-3">Competition Leaderboard</h4>
             <div className="space-y-2">
               {sortedUsers.map((user, index) => {
                 const total = Object.values(user.totalLogged).reduce((sum, val) => sum + val, 0);
@@ -443,7 +532,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
                 
                 return (
                   <div key={user.user.id} className={`flex items-center justify-between p-3 rounded-lg ${
-                    isCurrentUser ? 'bg-blue-100 border-2 border-blue-600' : 'bg-white border-2 border-black'
+                    isCurrentUser ? 'bg-blue-100' : 'bg-white'
                   }`}>
                     <div className="flex items-center space-x-3">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -478,11 +567,18 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
             <ResponsiveContainer width="100%" height={250}>
               <RechartsLineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fontSize: 12 }}
+                  interval={0}
+                  angle={selectedPeriod === 'week' ? 0 : -45}
+                  textAnchor={selectedPeriod === 'week' ? 'middle' : 'end'}
+                  height={selectedPeriod === 'week' ? 60 : 80}
+                />
                 <YAxis />
                 <Tooltip 
                   formatter={(value) => value !== undefined ? [`${value}`, 'Activity Points'] : []} 
-                  labelFormatter={(label) => `Date: ${label}`}
+                  labelFormatter={(label) => `Date: ${label.replace('\n', ' ')}`}
                 />
                 <Legend />
                 {userProgress.map((up, index) => (
@@ -507,11 +603,18 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
       <ResponsiveContainer width="100%" height={300}>
         <RechartsLineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
+          <XAxis 
+            dataKey="date" 
+            tick={{ fontSize: 12 }}
+            interval={0}
+            angle={selectedPeriod === 'week' ? 0 : -45}
+            textAnchor={selectedPeriod === 'week' ? 'middle' : 'end'}
+            height={selectedPeriod === 'week' ? 60 : 80}
+          />
           <YAxis />
           <Tooltip 
             formatter={(value) => value !== undefined ? [`${value}`, getTooltipLabel()] : []} 
-            labelFormatter={(label) => `Date: ${label}`}
+            labelFormatter={(label) => `Date: ${label.replace('\n', ' ')}`}
           />
           <Legend />
           {userNames.map((name, index) => (
@@ -545,11 +648,11 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
       case 'overview':
         return `Daily Progress Overview - ${periodLabel}`;
       case 'books':
-        return `Reading Competition - ${periodLabel}`;
+        return `Reading Progress - ${periodLabel}`;
       case 'exercise':
-        return `Fitness Competition - ${periodLabel}`;
+        return `Fitness Progress - ${periodLabel}`;
       case 'competition':
-        return `Friend Competition Ranking - ${periodLabel}`;
+        return `Competition Ranking - ${periodLabel}`;
       default:
         return `Progress Chart - ${periodLabel}`;
     }
@@ -557,7 +660,37 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-sm p-4 border-2 border-black">
+      {/* Chart Info Modal */}
+      {showChartInfoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Chart Information</h3>
+              <button
+                onClick={() => setShowChartInfoModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="text-gray-600 leading-relaxed whitespace-pre-line text-sm">
+              {chartInfoContent}
+            </div>
+            
+            <div className="mt-6">
+              <button
+                onClick={() => setShowChartInfoModal(false)}
+                className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-olive-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-olive-700 transition-colors"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl shadow-sm p-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900">Analytics Dashboard</h2>
           <div className="flex items-center space-x-1">
@@ -573,10 +706,10 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
               <button
                 key={period.value}
                 onClick={() => setSelectedPeriod(period.value)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap border-2 ${
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
                   selectedPeriod === period.value
-                    ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
+                    ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white shadow-lg'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {period.label}
@@ -594,10 +727,10 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
                 <button
                   key={type.value}
                   onClick={() => setSelectedChart(type.value)}
-                  className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors border-2 ${
+                  className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     selectedChart === type.value
-                      ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
+                      ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -609,16 +742,25 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 border-2 border-black">
+      <div className="bg-white rounded-xl shadow-sm p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-gray-900">{getChartTitle()}</h3>
+          <div className="flex items-center space-x-2">
+            <h3 className="text-base font-semibold text-gray-900">{getChartTitle()}</h3>
+            <button
+              onClick={() => showChartInfo(selectedChart)}
+              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+              title="Chart information"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
           <Target className="w-5 h-5 text-green-500" />
         </div>
         
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => navigatePeriod('prev')}
-            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors border-2 border-black hover:border-green-600"
+            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
             <span>Previous</span>
@@ -637,7 +779,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
           
           <button
             onClick={() => navigatePeriod('next')}
-            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors border-2 border-black hover:border-green-600"
+            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
           >
             <span>Next</span>
             <ChevronRight className="w-4 h-4" />
@@ -658,7 +800,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey = 0
       </div>
 
       {userProgress.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4 border-2 border-black">
+        <div className="bg-white rounded-xl shadow-sm p-4">
           <h3 className="text-base font-semibold text-gray-900 mb-3">🏆 Competition Highlights</h3>
           <div className="space-y-2 text-sm text-gray-600">
             <div>

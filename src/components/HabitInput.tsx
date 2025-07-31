@@ -32,7 +32,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
                 book_title: e.target.value,
                 book_finished: (completion as any)?.book_finished
               })}
-              className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+              className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
               placeholder="Book Title"
               disabled={disabled}
             />
@@ -45,7 +45,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
                 book_title: (completion as any)?.book_title || '',
                 book_finished: (completion as any)?.book_finished
               })}
-              className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+              className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
               placeholder="Pages"
               disabled={disabled}
             />
@@ -74,7 +74,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
             step="0.1"
             value={(completion as any)?.kilometers || ''}
             onChange={(e) => onUpdate({ kilometers: parseFloat(e.target.value) || 0 })}
-            className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+            className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
             placeholder="km"
             disabled={disabled}
           />
@@ -89,7 +89,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
                 topic: e.target.value,
                 completed: (completion as any)?.completed || false
               })}
-              className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+              className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
               disabled={disabled}
             >
               <option value="">Select topic</option>
@@ -169,7 +169,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
             step="0.5"
             value={(completion as any)?.hours || ''}
             onChange={(e) => onUpdate({ hours: parseFloat(e.target.value) || 0 })}
-            className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+            className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
             placeholder="hours"
             disabled={disabled}
           />
@@ -190,7 +190,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
                   weight_kg: (completion as any)?.weight_kg || 0,
                   minutes: parseInt(e.target.value) || 0 
                 })}
-                className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+                className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
                 placeholder="Exercise (min)"
                 disabled={disabled}
               />
@@ -208,7 +208,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
                 weight_kg: parseFloat(e.target.value) || 0,
                 minutes: (completion as any)?.minutes || 0
               })}
-              className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+              className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
               placeholder="Weight (kg)"
               disabled={disabled}
             />
@@ -220,7 +220,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
                 weight_kg: (completion as any)?.weight_kg || 0,
                 minutes: parseInt(e.target.value) || 0 
               })}
-              className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+              className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
               placeholder="Exercise (min)"
               disabled={disabled}
             />
@@ -234,7 +234,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
             min="0"
             value={(completion as any)?.minutes || ''}
             onChange={(e) => onUpdate({ minutes: parseInt(e.target.value) || 0 })}
-            className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+            className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
             placeholder="min"
             disabled={disabled}
           />
@@ -247,7 +247,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
             min="0"
             value={(completion as any)?.followers || ''}
             onChange={(e) => onUpdate({ followers: parseInt(e.target.value) || 0 })}
-            className="w-full p-1.5 text-xs border-2 border-black rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
+            className="w-full p-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none touch-manipulation"
             placeholder="Followers"
             disabled={disabled}
           />
@@ -260,7 +260,7 @@ const HabitInput: React.FC<HabitInputProps> = ({
 
   return (
     <div 
-      className={`p-1.5 rounded-md border-2 border-black transition-colors ${
+      className={`p-1.5 rounded-md border border-gray-300 transition-colors ${
         disabled ? 'opacity-50 cursor-not-allowed' : ''
       }`}
       style={{ backgroundColor: habit.color + '10' }}
