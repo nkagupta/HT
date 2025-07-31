@@ -101,32 +101,33 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) 
   }, [selectedPeriod, selectedChart, currentUser.id, dataRefreshKey]);
 
   const getDateRange = () => {
-    const now = new Date();
     let startDate: Date;
+    let endDate: Date;
 
     switch (selectedPeriod) {
       case 'week':
-        startDate = startOfWeek(now);
+        startDate = startOfWeek(currentDisplayDate, { weekStartsOn: 0 });
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
         break;
       case 'month':
-        startDate = startOfMonth(now);
+        startDate = startOfMonth(currentDisplayDate);
+        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
         break;
       case 'quarter':
-        startDate = startOfQuarter(now);
+        startDate = startOfQuarter(currentDisplayDate);
+        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0);
         break;
       case 'year':
-        startDate = startOfYear(now);
+        startDate = startOfYear(currentDisplayDate);
+        endDate = new Date(startDate.getFullYear(), 11, 31);
         break;
       default:
-        startDate = startOfMonth(now);
+        startDate = startOfMonth(currentDisplayDate);
+        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
     }
 
-    // Ensure week starts on Sunday
-    if (selectedPeriod === 'week') {
-      startDate = startOfWeek(now, { weekStartsOn: 0 });
-    }
-
-    return { startDate, endDate: now };
+    return { startDate, endDate };
   };
 
   const loadAllData = async () => {

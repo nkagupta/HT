@@ -125,7 +125,8 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
           totalLogged,
           currentStreak,
           weeklyTotal,
-          monthlyTotal: userCompletions.length
+          monthlyTotal: userCompletions.length,
+          allCompletions: userCompletions
         });
       }
 
@@ -419,27 +420,19 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
                   <h4 className="text-xs font-medium text-gray-900 uppercase tracking-wide">Individual Habits</h4>
                   {summary.habits.length > 0 ? (
                     summary.habits.map((habit) => {
-                      const likelihood = calculateLikelihood(habit, summary.allCompletions || []);
+                      const likelihood = calculateLikelihood(habit, (summary as any).allCompletions || []);
                       
                       return (
                         <div key={habit.id} className="p-2 bg-gray-50 rounded-lg flex items-center justify-between">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <div 
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: habit.color }}
-                              />
-                              <span className="text-sm font-medium text-gray-900">{habit.name}</span>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {habit.target && `Target: ${habit.target}`}
-                            </div>
-                          </div>
-                          <div>
+                          <div className="flex items-center space-x-2">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: habit.color }}
+                            />
                             <span className="text-sm font-medium text-gray-900">{habit.name}</span>
-                            {habit.target && (
-                              <div className="text-xs text-gray-500">Target: {habit.target}</div>
-                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {habit.target && `Target: ${habit.target}`}
                           </div>
                           
                           {/* Likelihood Button */}

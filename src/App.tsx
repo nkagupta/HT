@@ -37,12 +37,20 @@ function App() {
   // Track unsaved changes in settings
   const [settingsHaveUnsavedChanges, setSettingsHaveUnsavedChanges] = useState(false);
   
+  // Data refresh key for forcing re-renders
+  const [dataRefreshKey, setDataRefreshKey] = useState(0);
+  
   // Hamburger menu and about modal state
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   
   // Reference to hidden file input for data import
   const [importFileRef] = useState<React.RefObject<HTMLInputElement>>(React.createRef());
+
+  // Function to increment data refresh key
+  const incrementDataRefreshKey = () => {
+    setDataRefreshKey(prev => prev + 1);
+  };
 
   useEffect(() => {
     /**
@@ -431,6 +439,7 @@ function App() {
           <HabitSettings
             currentUser={currentUser}
             onUnsavedChangesChange={setSettingsHaveUnsavedChanges}
+            onDataRefresh={incrementDataRefreshKey}
             onDataRefresh={incrementDataRefreshKey}
           />
         )}

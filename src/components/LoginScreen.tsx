@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Mail, Eye, EyeOff, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { User as UserType } from '../utils/types';
 
@@ -7,191 +7,205 @@ interface LoginScreenProps {
   onLogin: (user: UserType) => void;
 }
 
-/**
- * Login Screen Component
- * 
- * Handles user authentication (login/signup) and automatic default habit creation.
- * Features:
- * - Email/password authentication
- * - User registration with profile creation
- * - Automatic default habit setup based on user name
- * - Password visibility toggle
- * - Form validation and error handling
- */
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
-  // Form state management
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    /**
-     * Check for existing user session on component mount
-     * Automatically log in user if valid session exists
-     */
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Fetch user profile data
-        const { data: userData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        
-        if (userData) {
-          // Automatically log in user
-          onLogin({
-            id: userData.id,
-            email: userData.email,
-            name: userData.name
-          });
-        }
-      }
-    };
-    
-    checkUser();
-  }, [onLogin]);
-
-  /**
-   * Handle form submission for both login and signup
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError(null);
+    setSuccess(null);
 
     try {
       if (isLogin) {
-        // Handle user login
-        const { data, error } = await supabase.auth.signInWithPassword({
+        // Login logic
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
           email,
-          password
+          password,
         });
+
+        if (authError) throw authError;
+
+        if (authData.user) {
+          // Fetch user profile data
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authData.user.id)
+            .single();
+
+          if (userError) throw userError;
+
+          if (userData) {
+            onLogin({
+              id: userData.id,
+              email: userData.email,
+              name: userData.name
+            });
+          }
+        }
+      } else {
+        // Signup logic
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (authError) throw authError;
+
+        if (authData.user) {
+          // Create user profile
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .insert([{
+              id: authData.user.id,
+              email: email,
+              name: name
+            }])
+            .select()
+            .single();
+
+          if (userError) throw userError;
+
+          if (userData) {
+            setSuccess('Account created successfully! You can now log in.');
+            setIsLogin(true);
+            setPassword('');
+            setName('');
+          }
+        }
       }
-    } catch (err) {
-      setError('An error occurred');
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      setError(error.message || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-lime-100 flex items-center justify-center px-4 py-8">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-        {/* Header Section */}
-        <div className="text-center mb-6">
-          <div className="flex justify-center mb-4">
-            <div className="bg-green-100 p-3 rounded-full">
-              <Calendar className="w-6 h-6 text-green-600" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-200">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-4">
+              <Calendar className="w-8 h-8 text-blue-600" />
             </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Habit Tracker</h1>
+            <p className="text-gray-600">
+              {isLogin ? 'Welcome back!' : 'Create your account'}
+            </p>
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Habit Tracker</h1>
-          <p className="text-sm text-gray-600">Track your daily habits and build consistency</p>
-        </div>
 
-        {/* Error Message Display */}
-        {error && (
-          <div className="text-red-600 text-sm text-center bg-red-50 p-3 rounded-lg mb-4">
-            {error}
-          </div>
-        )}
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2 text-red-800">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
 
-        {/* Login/Signup Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name field (only shown during signup) */}
-          {!isLogin && (
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-2 text-green-800">
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm">{success}</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="Enter your full name"
+                    required={!isLogin}
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
+                Email Address
               </label>
               <div className="relative">
-                <User className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                  placeholder="Enter your full name"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="Enter your email"
                   required
                 />
               </div>
             </div>
-          )}
 
-          {/* Email field */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <div className="relative">
-              <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                placeholder="Enter your email"
-                required
-              />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="Enter your password"
+                  required
+                  minLength={6}
+                />
+              </div>
             </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+              )}
+            </button>
+          </form>
+
+          {/* Toggle between login/signup */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError(null);
+                setSuccess(null);
+                setPassword('');
+                setName('');
+              }}
+              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              {isLogin 
+                ? "Don't have an account? Sign up" 
+                : "Already have an account? Sign in"
+              }
+            </button>
           </div>
-
-          {/* Password field with visibility toggle */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                placeholder="Enter your password"
-                required
-                minLength={6}
-              />
-              {/* Password visibility toggle button */}
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Submit button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              isLogin ? 'Sign In' : 'Sign Up'
-            )}
-          </button>
-        </form>
-
-        {/* Toggle between login and signup */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
-            }}
-            className="text-green-600 hover:text-green-700 text-sm font-medium"
-          >
-            {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-          </button>
         </div>
       </div>
     </div>

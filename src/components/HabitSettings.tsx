@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Plus, X, Zap, CheckCircle, AlertCircle, Info, Settings, Target } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { User, Habit, HabitType, HABIT_COLORS } from '../utils/types';
+import { User, Habit, HabitType, HABIT_COLORS, HabitCompletion, HabitCompletionData } from '../utils/types';
 
 interface HabitSettingsProps {
   currentUser: User;
   onUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
+  onDataRefresh?: () => void;
 }
 
 /**
@@ -31,7 +32,14 @@ interface ConfirmationState {
   suggestions: HabitSuggestion[];
 }
 
-const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedChangesChange }) => {
+const isWithinFourteenDays = (date: Date) => {
+  const today = new Date();
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(today.getDate() - 14);
+  return date >= fourteenDaysAgo;
+};
+
+const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedChangesChange, onDataRefresh }) => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -67,6 +75,327 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedCha
   const [isEditingLoadedEntry, setIsEditingLoadedEntry] = useState(false);
   const [editFormData, setEditFormData] = useState<HabitCompletionData | null>(null);
   const [entryManagementError, setEntryManagementError] = useState<string | null>(null);
+
+  // Load entry for management
+  const handleLoadEntry = async () => {
+    if (!selectedDateForManagement || !selectedHabitIdForManagement) return;
+    
+    setSaving(true);
+    setEntryManagementError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('habit_completions')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .eq('date', selectedDateForManagement)
+        .eq('habit_id', selectedHabitIdForManagement)
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setLoadedCompletionForManagement(data);
+        setEditFormData(data.data);
+        setEntryManagementError(null);
+      } else {
+        setLoadedCompletionForManagement(null);
+        setEditFormData(null);
+        setEntryManagementError('No entry found for this date and habit.');
+      }
+    } catch (error) {
+      console.error('Error loading entry:', error);
+      setEntryManagementError('Failed to load entry. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Start editing loaded entry
+  const handleEditEntry = () => {
+    setIsEditingLoadedEntry(true);
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    if (loadedCompletionForManagement) {
+      setEditFormData(loadedCompletionForManagement.data);
+    }
+    setIsEditingLoadedEntry(false);
+  };
+
+  // Save edited entry
+  const handleSaveEdit = async () => {
+    if (!loadedCompletionForManagement || !editFormData) return;
+    
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('habit_completions')
+        .update({ data: editFormData })
+        .eq('id', loadedCompletionForManagement.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setLoadedCompletionForManagement(data);
+      setIsEditingLoadedEntry(false);
+      showNotification('success', 'Entry updated successfully!');
+      
+      // Trigger data refresh
+      if (onDataRefresh) {
+        onDataRefresh();
+      }
+    } catch (error) {
+      console.error('Error updating entry:', error);
+      showNotification('error', 'Failed to update entry. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete entry
+  const handleDeleteEntry = async () => {
+    if (!loadedCompletionForManagement) return;
+    
+    const entryDate = new Date(selectedDateForManagement);
+    const isWithin14Days = isWithinFourteenDays(entryDate);
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    
+    let confirmMessage;
+    if (isWithin14Days) {
+      confirmMessage = 'Are you sure you want to delete this entry?';
+    } else {
+      confirmMessage = `This entry is older than ${fourteenDaysAgo.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric' 
+      })}. Deleting this entry is permanent, and once deleted, no further updates can be made for this specific entry. Are you sure you want to proceed?`;
+    }
+    
+    if (!confirm(confirmMessage)) return;
+    
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('habit_completions')
+        .delete()
+        .eq('id', loadedCompletionForManagement.id);
+      
+      if (error) throw error;
+      
+      setLoadedCompletionForManagement(null);
+      setEditFormData(null);
+      setIsEditingLoadedEntry(false);
+      showNotification('success', 'Entry deleted successfully!');
+      
+      // Trigger data refresh
+      if (onDataRefresh) {
+        onDataRefresh();
+      }
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      showNotification('error', 'Failed to delete entry. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Render entry data for display or editing
+  const renderEntryData = (habit: Habit, data: HabitCompletionData, isEditing: boolean) => {
+    if (!data) return null;
+
+    const updateEditFormData = (updates: Partial<HabitCompletionData>) => {
+      setEditFormData(prev => prev ? { ...prev, ...updates } : null);
+    };
+
+    switch (habit.type) {
+      case 'book':
+        return (
+          <div className="space-y-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Pages Read</label>
+              {isEditing ? (
+                <input
+                  type="number"
+                  value={data.pages || 0}
+                  onChange={(e) => updateEditFormData({ pages: parseInt(e.target.value) || 0 })}
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                  min="0"
+                />
+              ) : (
+                <span className="text-sm text-gray-900">{data.pages || 0} pages</span>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Book Title (if finished)</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={data.bookTitle || ''}
+                  onChange={(e) => updateEditFormData({ bookTitle: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                  placeholder="Optional"
+                />
+              ) : (
+                <span className="text-sm text-gray-900">{data.bookTitle || 'N/A'}</span>
+              )}
+            </div>
+          </div>
+        );
+      
+      case 'running':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-700">Distance (km)</label>
+            {isEditing ? (
+              <input
+                type="number"
+                step="0.1"
+                value={data.distance || 0}
+                onChange={(e) => updateEditFormData({ distance: parseFloat(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded text-sm"
+                min="0"
+              />
+            ) : (
+              <span className="text-sm text-gray-900">{data.distance || 0} km</span>
+            )}
+          </div>
+        );
+      
+      case 'ai_learning':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-700">Topics Studied</label>
+            {isEditing ? (
+              <input
+                type="number"
+                value={data.topics || 0}
+                onChange={(e) => updateEditFormData({ topics: parseInt(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded text-sm"
+                min="0"
+              />
+            ) : (
+              <span className="text-sm text-gray-900">{data.topics || 0} topics</span>
+            )}
+          </div>
+        );
+      
+      case 'job_search':
+        return (
+          <div className="space-y-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Applications Sent</label>
+              {isEditing ? (
+                <input
+                  type="number"
+                  value={data.applications || 0}
+                  onChange={(e) => updateEditFormData({ applications: parseInt(e.target.value) || 0 })}
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                  min="0"
+                />
+              ) : (
+                <span className="text-sm text-gray-900">{data.applications || 0} applications</span>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700">CV Updated</label>
+              {isEditing ? (
+                <select
+                  value={data.cvUpdated ? 'yes' : 'no'}
+                  onChange={(e) => updateEditFormData({ cvUpdated: e.target.value === 'yes' })}
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              ) : (
+                <span className="text-sm text-gray-900">{data.cvUpdated ? 'Yes' : 'No'}</span>
+              )}
+            </div>
+          </div>
+        );
+      
+      case 'swimming':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-700">Hours Swum</label>
+            {isEditing ? (
+              <input
+                type="number"
+                step="0.5"
+                value={data.hours || 0}
+                onChange={(e) => updateEditFormData({ hours: parseFloat(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded text-sm"
+                min="0"
+              />
+            ) : (
+              <span className="text-sm text-gray-900">{data.hours || 0} hours</span>
+            )}
+          </div>
+        );
+      
+      case 'weight':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-700">Weight (kg)</label>
+            {isEditing ? (
+              <input
+                type="number"
+                step="0.1"
+                value={data.weight || 0}
+                onChange={(e) => updateEditFormData({ weight: parseFloat(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded text-sm"
+                min="0"
+              />
+            ) : (
+              <span className="text-sm text-gray-900">{data.weight || 0} kg</span>
+            )}
+          </div>
+        );
+      
+      case 'exercise':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-700">Minutes Exercised</label>
+            {isEditing ? (
+              <input
+                type="number"
+                value={data.minutes || 0}
+                onChange={(e) => updateEditFormData({ minutes: parseInt(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded text-sm"
+                min="0"
+              />
+            ) : (
+              <span className="text-sm text-gray-900">{data.minutes || 0} minutes</span>
+            )}
+          </div>
+        );
+      
+      case 'instagram':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-700">Follower Count</label>
+            {isEditing ? (
+              <input
+                type="number"
+                value={data.followers || 0}
+                onChange={(e) => updateEditFormData({ followers: parseInt(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded text-sm"
+                min="0"
+              />
+            ) : (
+              <span className="text-sm text-gray-900">{data.followers || 0} followers</span>
+            )}
+          </div>
+        );
+      
+      default:
+        return <span className="text-sm text-gray-500">Unknown habit type</span>;
+    }
+  };
 
   useEffect(() => {
     if (onUnsavedChangesChange) {
