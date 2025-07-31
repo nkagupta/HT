@@ -9,6 +9,7 @@ interface LoginScreenProps {
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -23,7 +24,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     setSuccess(null);
 
     try {
-      if (isLogin) {
+      if (isForgotPassword) {
+        // Forgot password logic
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`
+        });
+
+        if (resetError) throw resetError;
+        
+        setSuccess('Password reset email sent! Check your inbox.');
+        setIsForgotPassword(false);
+      } else if (isLogin) {
         // Login logic
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
           email,
@@ -96,11 +107,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <Calendar className="w-8 h-8 text-blue-600" />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-xl">H</span>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Habit Tracker</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">HabitFlow</h1>
             <p className="text-gray-600">
-              {isLogin ? 'Welcome back!' : 'Create your account'}
+              {isForgotPassword ? 'Reset your password' : isLogin ? 'Welcome back!' : 'Create your account'}
             </p>
           </div>
 
@@ -121,7 +134,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+            {!isLogin && !isForgotPassword && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Full Name
@@ -157,23 +170,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="Enter your password"
-                  required
-                  minLength={6}
-                />
+            {!isForgotPassword && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="Enter your password"
+                    required
+                    minLength={6}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <button
               type="submit"
@@ -183,28 +198,65 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+                <span>
+                  {isForgotPassword ? 'Send Reset Email' : isLogin ? 'Sign In' : 'Create Account'}
+                </span>
               )}
             </button>
           </form>
 
           {/* Toggle between login/signup */}
           <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError(null);
-                setSuccess(null);
-                setPassword('');
-                setName('');
-              }}
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium px-3 py-1 rounded-lg transition-colors"
-            >
-              {isLogin 
-                ? "Don't have an account? Sign up" 
-                : "Already have an account? Sign in"
-              }
-            </button>
+            <div className="space-y-2">
+              {!isForgotPassword && (
+                <>
+                  <button
+                    onClick={() => {
+                      setIsLogin(!isLogin);
+                      setError(null);
+                      setSuccess(null);
+                      setPassword('');
+                      setName('');
+                    }}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium px-3 py-1 rounded-lg transition-colors"
+                  >
+                    {isLogin 
+                      ? "Don't have an account? Sign up" 
+                      : "Already have an account? Sign in"
+                    }
+                  </button>
+                  
+                  {isLogin && (
+                    <div>
+                      <button
+                        onClick={() => {
+                          setIsForgotPassword(true);
+                          setError(null);
+                          setSuccess(null);
+                        }}
+                        className="text-gray-600 hover:text-gray-700 text-sm px-3 py-1 rounded-lg transition-colors"
+                      >
+                        Forgot your password?
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {isForgotPassword && (
+                <button
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setIsLogin(true);
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium px-3 py-1 rounded-lg transition-colors"
+                >
+                  Back to sign in
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

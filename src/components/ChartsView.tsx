@@ -18,6 +18,22 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('week');
   const [showInfo, setShowInfo] = useState(false);
 
+  // Add null checks for props
+  const safeHabits = habits || [];
+  const safeHabitCompletions = habitCompletions || [];
+  const safeUsers = users || [];
+
+  // Show loading state if required data is not available
+  if (!habits || !habitCompletions || !users || !currentUser) {
+    return (
+      <div className="p-4 max-w-6xl mx-auto">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-500">Loading analytics...</div>
+        </div>
+      </div>
+    );
+  }
+
   const chartTypes = [
     { id: 'overview' as ChartType, label: 'Daily Progress', icon: Calendar },
     { id: 'books' as ChartType, label: 'Reading', icon: BookOpen },
@@ -46,10 +62,10 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
     
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
-      const dayCompletions = habitCompletions.filter(c => c.date === dateStr);
+      const dayCompletions = safeHabitCompletions.filter(c => c.date === dateStr);
       
       if (selectedChart === 'overview') {
-        const totalHabits = habits.length;
+        const totalHabits = safeHabits.length;
         const completedHabits = dayCompletions.length;
         data.push({
           date: timePeriod === 'week' ? 
@@ -60,10 +76,10 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
         });
       } else if (selectedChart === 'books') {
         const bookCompletions = dayCompletions.filter(c => {
-          const habit = habits.find(h => h.id === c.habit_id);
+          const habit = safeHabits.find(h => h.id === c.habit_id);
           return habit?.type === 'book';
         });
-        const totalPages = bookCompletions.reduce((sum, c) => sum + (c.data?.pages || 0), 0);
+        const totalPages = bookCompletions.reduce((sum, c) => sum + (c.data?.pages_read || 0), 0);
         data.push({
           date: timePeriod === 'week' ? 
             d.toLocaleDateString('en-US', { weekday: 'short' }) + '\n' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) :
@@ -73,7 +89,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
         });
       } else if (selectedChart === 'exercise') {
         const exerciseCompletions = dayCompletions.filter(c => {
-          const habit = habits.find(h => h.id === c.habit_id);
+          const habit = safeHabits.find(h => h.id === c.habit_id);
           return ['running', 'swimming', 'weight', 'exercise'].includes(habit?.type || '');
         });
         const totalMinutes = exerciseCompletions.reduce((sum, c) => sum + (c.data?.minutes || 0), 0);
@@ -88,7 +104,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
     }
     
     return data;
-  }, [habits, habitCompletions, selectedChart, timePeriod]);
+  }, [safeHabits, safeHabitCompletions, selectedChart, timePeriod]);
 
   // Competition data
   const competitionData = useMemo(() => {
@@ -96,8 +112,8 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
     
     const { start, end } = getDateRange();
     
-    return users.map(user => {
-      const userCompletions = habitCompletions.filter(c => {
+    return safeUsers.map(user => {
+      const userCompletions = safeHabitCompletions.filter(c => {
         const completionDate = new Date(c.date);
         return c.user_id === user.id && completionDate >= start && completionDate <= end;
       });
@@ -110,12 +126,12 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
         isCurrentUser: user.id === currentUser.id
       };
     }).sort((a, b) => b.score - a.score);
-  }, [users, habitCompletions, currentUser, selectedChart, timePeriod]);
+  }, [safeUsers, safeHabitCompletions, currentUser, selectedChart, timePeriod]);
 
   // Period highlights
   const periodHighlights = useMemo(() => {
     const { start, end } = getDateRange();
-    const periodCompletions = habitCompletions.filter(c => {
+    const periodCompletions = safeHabitCompletions.filter(c => {
       const completionDate = new Date(c.date);
       return completionDate >= start && completionDate <= end;
     });
@@ -137,11 +153,11 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
     // Most pages read
     const pagesByUser: { [key: string]: number } = {};
     periodCompletions.forEach(c => {
-      const habit = habits.find(h => h.id === c.habit_id);
-      if (habit?.type === 'book' && c.data?.pages) {
-        const user = users.find(u => u.id === c.user_id);
+      const habit = safeHabits.find(h => h.id === c.habit_id);
+      if (habit?.type === 'book' && c.data?.pages_read) {
+        const user = safeUsers.find(u => u.id === c.user_id);
         if (user) {
-          pagesByUser[user.name] = (pagesByUser[user.name] || 0) + c.data.pages;
+          pagesByUser[user.name] = (pagesByUser[user.name] || 0) + c.data.pages_read;
         }
       }
     });
@@ -155,9 +171,9 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
     // Most exercise time
     const exerciseByUser: { [key: string]: number } = {};
     periodCompletions.forEach(c => {
-      const habit = habits.find(h => h.id === c.habit_id);
+      const habit = safeHabits.find(h => h.id === c.habit_id);
       if (['running', 'swimming', 'weight', 'exercise'].includes(habit?.type || '') && c.data?.minutes) {
-        const user = users.find(u => u.id === c.user_id);
+        const user = safeUsers.find(u => u.id === c.user_id);
         if (user) {
           exerciseByUser[user.name] = (exerciseByUser[user.name] || 0) + c.data.minutes;
         }
@@ -171,7 +187,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
     }
 
     return highlights;
-  }, [habits, habitCompletions, users, timePeriod]);
+  }, [safeHabits, safeHabitCompletions, safeUsers, timePeriod]);
 
   const getChartInfo = () => {
     switch (selectedChart) {
@@ -227,7 +243,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
             <div>
               <p className="text-sm text-green-600 font-medium">Total Completions</p>
               <p className="text-2xl font-bold text-green-800">
-                {habitCompletions.filter(c => {
+                {safeHabitCompletions.filter(c => {
                   const { start, end } = getDateRange();
                   const completionDate = new Date(c.date);
                   return completionDate >= start && completionDate <= end;
@@ -246,7 +262,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
                 {(() => {
                   const { start, end } = getDateRange();
                   const activeDays = new Set();
-                  habitCompletions.forEach(c => {
+                  safeHabitCompletions.forEach(c => {
                     const completionDate = new Date(c.date);
                     if (completionDate >= start && completionDate <= end) {
                       activeDays.add(c.date);

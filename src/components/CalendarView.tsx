@@ -434,7 +434,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   if (habits.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 text-center">
-        <Book className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+        <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-green-400 rounded-xl flex items-center justify-center mx-auto mb-3 opacity-50">
+          <span className="text-white font-bold text-lg">H</span>
+        </div>
         <h3 className="text-base font-semibold text-gray-900 mb-2">No Habits Yet</h3>
         <p className="text-sm text-gray-600 mb-4">Get started by adding your first habit in the settings.</p>
       </div>

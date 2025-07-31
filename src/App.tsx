@@ -7,7 +7,7 @@ import HabitSettings from './components/HabitSettings';
 import SummaryView from './components/SummaryView';
 import ChartsView from './components/ChartsView';
 import PersonalProgressView from './components/PersonalProgressView';
-import { User as UserType } from './utils/types';
+import { User as UserType, Habit, HabitCompletion, Book } from './utils/types';
 
 /**
  * Main Application Component
@@ -21,21 +21,82 @@ function App() {
   const [settingsHaveUnsavedChanges, setSettingsHaveUnsavedChanges] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  
+  // Global data states
+  const [allHabits, setAllHabits] = useState<Habit[]>([]);
+  const [allCompletions, setAllCompletions] = useState<HabitCompletion[]>([]);
+  const [allUsers, setAllUsers] = useState<UserType[]>([]);
+  const [allBooks, setAllBooks] = useState<Book[]>([]);
 
   const incrementDataRefreshKey = () => setDataRefreshKey(prev => prev + 1);
 
+  // Fetch global app data
+  const fetchGlobalAppData = async () => {
+    if (!currentUser) return;
+
+    try {
+      // Fetch all habits
+      const { data: habitsData, error: habitsError } = await supabase
+        .from('habits')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (habitsError) throw habitsError;
+      setAllHabits(habitsData || []);
+
+      // Fetch all habit completions
+      const { data: completionsData, error: completionsError } = await supabase
+        .from('habit_completions')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (completionsError) throw completionsError;
+      setAllCompletions(completionsData || []);
+
+      // Fetch all users
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (usersError) throw usersError;
+      setAllUsers(usersData || []);
+
+      // Fetch all books
+      const { data: booksData, error: booksError } = await supabase
+        .from('books')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (booksError) throw booksError;
+      setAllBooks(booksData || []);
+
+    } catch (error) {
+      console.error('Error fetching global app data:', error);
+    }
+  };
   useEffect(() => {
     checkUser();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         setCurrentUser(null);
+        setAllHabits([]);
+        setAllCompletions([]);
+        setAllUsers([]);
+        setAllBooks([]);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  // Fetch global data when user changes or data refresh is triggered
+  useEffect(() => {
+    if (currentUser) {
+      fetchGlobalAppData();
+    }
+  }, [currentUser, dataRefreshKey]);
   const checkUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -76,6 +137,7 @@ function App() {
       setSettingsHaveUnsavedChanges(false);
     }
     setCurrentView(newView);
+    setShowHamburgerMenu(false);
     
     // Fix mobile zoom issue - reset viewport
     const metaViewport = document.querySelector('meta[name="viewport"]');
@@ -147,7 +209,9 @@ The app encourages consistency through visual progress tracking, friendly compet
                 onClick={() => handleViewChange('calendar')}
                 className="flex items-center space-x-3 hover:opacity-75 transition-opacity group"
               >
-                <Calendar className="w-8 h-8 text-blue-600 group-hover:scale-105 transition-transform" />
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-green-600 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-white font-bold text-lg">H</span>
+                </div>
                 <div className="text-left">
                   <h1 className="text-2xl font-bold text-gray-900 leading-tight">HabitFlow</h1>
                   <div className="flex items-center space-x-2 text-sm">
@@ -175,6 +239,21 @@ The app encourages consistency through visual progress tracking, friendly compet
               {showHamburgerMenu && (
                 <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border-2 border-black z-50">
                   <div className="p-4 space-y-4">
+                    {/* Settings Button */}
+                    <button
+                      onClick={() => handleViewChange('settings')}
+                      className="w-full flex items-center space-x-3 p-4 text-left text-gray-700 hover:bg-green-50 rounded-lg transition-colors"
+                    >
+                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <div>
+                        <div className="font-semibold">Settings</div>
+                        <div className="text-sm text-gray-500">Manage habits and preferences</div>
+                      </div>
+                    </button>
+                    
                     {/* Info Button */}
                     <button
                       onClick={() => {
@@ -208,9 +287,9 @@ The app encourages consistency through visual progress tracking, friendly compet
           </div>
         </div>
 
-        {/* Navigation Tabs - Keep black borders for header elements */}
+        {/* Navigation Tabs - Fixed syntax and structure */}
         <div className="px-4 pb-4">
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-4 gap-1">
             <button
               onClick={() => handleViewChange('calendar')}
               className={`flex items-center justify-center space-x-1 py-3 px-1 text-xs font-medium rounded-lg transition-all border-2 ${
@@ -260,21 +339,6 @@ The app encourages consistency through visual progress tracking, friendly compet
               <User className="w-4 h-4" />
               <span>Personal</span>
             </button>
-            
-            <button
-              onClick={() => handleViewChange('settings')}
-              className={`flex items-center justify-center space-x-1 py-3 px-1 text-xs font-medium rounded-lg transition-all border-2 ${
-                currentView === 'settings' 
-                  ? 'bg-gradient-to-r from-green-600 to-olive-600 text-white border-black shadow-lg' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-black hover:border-gray-600'
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>Settings</span>
-            </button>
           </div>
         </div>
       </header>
@@ -311,15 +375,41 @@ The app encourages consistency through visual progress tracking, friendly compet
 
       {/* Main Content */}
       <main className="px-4 py-4 max-w-md mx-auto">
-        {currentView === 'calendar' && <CalendarView currentUser={currentUser} onDataRefresh={incrementDataRefreshKey} />}
-        {currentView === 'charts' && <ChartsView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
-        {currentView === 'progress' && <SummaryView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
-        {currentView === 'personal' && <PersonalProgressView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />}
+        {currentView === 'calendar' && (
+          <CalendarView 
+            currentUser={currentUser} 
+            onDataRefresh={incrementDataRefreshKey} 
+          />
+        )}
+        {currentView === 'charts' && (
+          <ChartsView
+            habits={allHabits}
+            habitCompletions={allCompletions}
+            users={allUsers}
+            currentUser={currentUser} 
+          />
+        )}
+        {currentView === 'progress' && (
+          <SummaryView
+            habits={allHabits}
+            habitCompletions={allCompletions}
+            users={allUsers}
+            books={allBooks}
+            currentUser={currentUser} 
+          />
+        )}
+        {currentView === 'personal' && (
+          <PersonalProgressView 
+            habits={allHabits}
+            habitCompletions={allCompletions}
+            currentUser={currentUser} 
+          />
+        )}
         {currentView === 'settings' && (
           <HabitSettings
-            currentUser={currentUser}
-            onUnsavedChangesChange={setSettingsHaveUnsavedChanges}
-            onDataRefresh={incrementDataRefreshKey}
+            habits={allHabits}
+            onHabitsUpdate={incrementDataRefreshKey}
+            userId={currentUser.id}
           />
         )}
       </main>
