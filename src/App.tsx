@@ -34,6 +34,9 @@ function App() {
   // Loading state for initial app load
   const [loading, setLoading] = useState(true);
   
+  // Track unsaved changes in settings
+  const [settingsHaveUnsavedChanges, setSettingsHaveUnsavedChanges] = useState(false);
+  
   // Reference to hidden file input for data import
   const [importFileRef] = useState<React.RefObject<HTMLInputElement>>(React.createRef());
 
@@ -250,6 +253,21 @@ function App() {
     setCurrentView('calendar');
   };
 
+  /**
+   * Handle view changes with unsaved changes check
+   */
+  const handleViewChange = (newView: 'calendar' | 'settings' | 'summary' | 'charts') => {
+    if (currentView === 'settings' && settingsHaveUnsavedChanges) {
+      const confirmLeave = window.confirm('You have unsaved changes in settings. Are you sure you want to leave?');
+      if (!confirmLeave) {
+        return;
+      }
+      // Reset unsaved changes state if user confirms
+      setSettingsHaveUnsavedChanges(false);
+    }
+    setCurrentView(newView);
+  };
+
   // Show loading spinner while checking authentication
   if (loading) {
     return (
@@ -274,7 +292,7 @@ function App() {
           <div className="flex items-center justify-between mb-3">
             {/* App logo and title */}
             <button 
-              onClick={() => setCurrentView('calendar')}
+              onClick={() => handleViewChange('calendar')}
               className="flex items-center space-x-2 hover:opacity-75 transition-opacity touch-manipulation"
             >
               <Calendar className="w-6 h-6 text-blue-600" />
@@ -331,10 +349,10 @@ function App() {
           <div className="grid grid-cols-4 gap-1">
             {/* Calendar view tab */}
             <button
-              onClick={() => setCurrentView('calendar')}
+              onClick={() => handleViewChange('calendar')}
               className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
                 currentView === 'calendar' 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -344,10 +362,10 @@ function App() {
             
             {/* Charts view tab */}
             <button
-              onClick={() => setCurrentView('charts')}
+              onClick={() => handleViewChange('charts')}
               className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
                 currentView === 'charts' 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -357,10 +375,10 @@ function App() {
             
             {/* Summary view tab */}
             <button
-              onClick={() => setCurrentView('summary')}
+              onClick={() => handleViewChange('summary')}
               className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
                 currentView === 'summary' 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -370,10 +388,10 @@ function App() {
             
             {/* Settings view tab */}
             <button
-              onClick={() => setCurrentView('settings')}
+              onClick={() => handleViewChange('settings')}
               className={`flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium rounded-lg transition-colors ${
                 currentView === 'settings' 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -408,6 +426,7 @@ function App() {
         {currentView === 'settings' && (
           <HabitSettings
             currentUser={currentUser}
+            onUnsavedChangesChange={setSettingsHaveUnsavedChanges}
           />
         )}
       </main>

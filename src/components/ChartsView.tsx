@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, BarChart3, LineChart } from 'lucide-react';
+import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, BarChart3, LineChart, User } from 'lucide-react';
 import { BarChart, Bar, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, subDays, eachDayOfInterval, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from 'date-fns';
 import { supabase } from '../lib/supabase';
@@ -34,14 +34,44 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser }) => {
   ];
 
   const chartTypes = [
-    { value: 'overview' as ChartType, label: 'Daily Progress', icon: TrendingUp },
     { value: 'books' as ChartType, label: 'Reading Competition', icon: BookOpen },
     { value: 'exercise' as ChartType, label: 'Fitness Competition', icon: Activity },
+    { value: 'overview' as ChartType, label: 'Daily Progress', icon: TrendingUp },
     { value: 'competition' as ChartType, label: 'Overall Ranking', icon: Users }
   ];
 
   const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#F97316'];
 
+  // Custom dot component for chart icons
+  const CustomDot = (props: any) => {
+    const { cx, cy, payload, dataKey } = props;
+    
+    // Only show icon on the last data point
+    if (payload && chartData && payload === chartData[chartData.length - 1]) {
+      let IconComponent = User; // Default icon
+      
+      // Determine icon based on chart type
+      if (selectedChart === 'books') {
+        IconComponent = BookOpen;
+      } else if (selectedChart === 'exercise') {
+        IconComponent = Activity;
+      }
+      
+      return (
+        <g>
+          <circle cx={cx} cy={cy} r={8} fill="white" stroke={props.stroke} strokeWidth={2} />
+          <foreignObject x={cx - 6} y={cy - 6} width={12} height={12}>
+            <div className="flex items-center justify-center w-full h-full">
+              <IconComponent className="w-3 h-3" style={{ color: props.stroke }} />
+            </div>
+          </foreignObject>
+        </g>
+      );
+    }
+    
+    // Regular small dot for other points
+    return <circle cx={cx} cy={cy} r={2} fill={props.stroke} />;
+  };
   useEffect(() => {
     loadAllData();
   }, [selectedPeriod, selectedChart, currentUser.id]);
@@ -65,6 +95,11 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser }) => {
         break;
       default:
         startDate = startOfMonth(now);
+    }
+
+    // Ensure week starts on Sunday
+    if (selectedPeriod === 'week') {
+      startDate = startOfWeek(now, { weekStartsOn: 0 });
     }
 
     return { startDate, endDate: now };
@@ -399,43 +434,77 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser }) => {
       );
     }
 
-    // Regular charts for other types
+    // Streak Visualization for overview
+    if (selectedChart === 'overview') {
+      return (
+        <div className="space-y-6">
+          {/* Streak Visualization */}
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-3">Current Streaks</h4>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart
+                data={userProgress.map(up => ({
+                  name: up.user.name.split(' ')[0],
+                  streak: up.currentStreak
+                }))}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value, name) => [`${value} days`, 'Current Streak']} />
+                <Bar dataKey="streak" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Daily Progress Line Chart */}
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-3">Daily Progress Trends</h4>
+            <ResponsiveContainer width="100%" height={250}>
+              <RechartsLineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip formatter={(value) => [`${value}`, 'Total Logged']} />
+                <Legend />
+                {userProgress.map((up, index) => (
+                  <Line
+                    key={up.user.name}
+                    type="monotone"
+                    dataKey={up.user.name.split(' ')[0]}
+                    stroke={colors[index % colors.length]}
+                    strokeWidth={1.5}
+                    dot={<CustomDot />}
+                  />
+                ))}
+              </RechartsLineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      );
+    }
+
+    // Regular line charts for other types
     return (
       <ResponsiveContainer width="100%" height={300}>
-        {selectedChart === 'overview' ? (
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip formatter={(value) => [`${value}`, 'Total Logged']} />
-            <Legend />
-            {userNames.map((name, index) => (
-              <Bar
-                key={name}
-                dataKey={name}
-                fill={colors[index % colors.length]}
-              />
-            ))}
-          </BarChart>
-        ) : (
-          <RechartsLineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip formatter={(value) => [`${value}`, getTooltipLabel()]} />
-            <Legend />
-            {userNames.map((name, index) => (
-              <Line
-                key={name}
-                type="monotone"
-                dataKey={name}
-                stroke={colors[index % colors.length]}
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-            ))}
-          </RechartsLineChart>
-        )}
+        <RechartsLineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip formatter={(value) => [`${value}`, getTooltipLabel()]} />
+          <Legend />
+          {userNames.map((name, index) => (
+            <Line
+              key={name}
+              type="monotone"
+              dataKey={name}
+              stroke={colors[index % colors.length]}
+              strokeWidth={1.5}
+              dot={{ r: 2 }}
+            />
+          ))}
+        </RechartsLineChart>
       </ResponsiveContainer>
     );
   };

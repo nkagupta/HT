@@ -188,7 +188,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               setIsLogin(!isLogin);
               setError('');
             }}
-            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+            className="text-purple-600 hover:text-purple-700 text-sm font-medium"
           >
             {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
           </button>

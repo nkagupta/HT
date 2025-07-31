@@ -302,32 +302,52 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
               <div 
                 key={summary.user.id} 
                 className={`p-4 rounded-xl border-2 transition-all ${
-                  isCurrentUser 
-                    ? 'border-blue-500 bg-blue-50' 
+                  index === 0 
+                    ? 'border-gradient-to-r from-yellow-400 to-yellow-600 bg-gradient-to-br from-yellow-50 to-yellow-100 shadow-lg'
+                    : index === 1
+                    ? 'border-gradient-to-r from-gray-400 to-gray-600 bg-gradient-to-br from-gray-50 to-gray-100 shadow-md'
+                    : index === 2
+                    ? 'border-gradient-to-r from-orange-400 to-orange-600 bg-gradient-to-br from-orange-50 to-orange-100 shadow-md'
+                    : isCurrentUser 
+                    ? 'border-blue-500 bg-blue-50 shadow-sm' 
                     : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                      index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' :
-                      index === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-600' :
-                      index === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600' :
+                      index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-lg' :
+                      index === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-600 shadow-md' :
+                      index === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600 shadow-md' :
                       'bg-gradient-to-br from-blue-500 to-purple-600'
                     }`}>
-                      {index < 3 ? (index + 1) : summary.user.name.charAt(0).toUpperCase()}
+                      {index < 3 ? (
+                        <span className="drop-shadow-sm">{index + 1}</span>
+                      ) : (
+                        summary.user.name.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
                         <span>{summary.user.name}</span>
                         {isCurrentUser && (
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full shadow-sm">
                             You
                           </span>
                         )}
                         {index === 0 && (
-                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full shadow-sm">
                             🏆 Leader
+                          </span>
+                        )}
+                        {index === 1 && (
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-800 text-xs font-medium rounded-full shadow-sm">
+                            🥈 Second
+                          </span>
+                        )}
+                        {index === 2 && (
+                          <span className="px-2 py-0.5 bg-orange-100 text-orange-800 text-xs font-medium rounded-full shadow-sm">
+                            🥉 Third
                           </span>
                         )}
                       </h3>
@@ -340,15 +360,27 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
 
                 {/* Competition Stats */}
                 <div className="grid grid-cols-3 gap-2 mb-3">
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <div className={`text-center p-2 rounded-lg ${
+                    index === 0 ? 'bg-yellow-100' : 
+                    index === 1 ? 'bg-gray-100' : 
+                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
+                  }`}>
                     <div className="text-lg font-bold text-blue-600">{summary.totalLogged.pages}</div>
                     <div className="text-xs text-gray-600">Pages</div>
                   </div>
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <div className={`text-center p-2 rounded-lg ${
+                    index === 0 ? 'bg-yellow-100' : 
+                    index === 1 ? 'bg-gray-100' : 
+                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
+                  }`}>
                     <div className="text-lg font-bold text-green-600">{summary.totalLogged.kilometers}</div>
                     <div className="text-xs text-gray-600">Kilometers</div>
                   </div>
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <div className={`text-center p-2 rounded-lg ${
+                    index === 0 ? 'bg-yellow-100' : 
+                    index === 1 ? 'bg-gray-100' : 
+                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
+                  }`}>
                     <div className="text-lg font-bold text-purple-600">{summary.totalLogged.minutes}</div>
                     <div className="text-xs text-gray-600">Minutes</div>
                   </div>
@@ -356,14 +388,22 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
 
                 {/* Streak and Weekly Info */}
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <div className={`text-center p-2 rounded-lg ${
+                    index === 0 ? 'bg-yellow-100' : 
+                    index === 1 ? 'bg-gray-100' : 
+                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
+                  }`}>
                     <div className="flex items-center justify-center space-x-1">
                       {getStreakIcon(summary.currentStreak)}
                       <span className="text-lg font-bold text-gray-900">{summary.currentStreak}</span>
                     </div>
                     <div className="text-xs text-gray-600">Day Streak</div>
                   </div>
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
+                  <div className={`text-center p-2 rounded-lg ${
+                    index === 0 ? 'bg-yellow-100' : 
+                    index === 1 ? 'bg-gray-100' : 
+                    index === 2 ? 'bg-orange-100' : 'bg-gray-50'
+                  }`}>
                     <div className="text-lg font-bold text-orange-600">{summary.weeklyTotal}</div>
                     <div className="text-xs text-gray-600">This Week</div>
                   </div>
@@ -414,20 +454,51 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
 
       {/* Competition Insights */}
       {userSummaries.length > 1 && (
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
-          <h3 className="text-base font-semibold text-gray-900 mb-3">🏆 Competition Insights</h3>
-          <div className="space-y-2 text-sm text-gray-600">
-            <div>
-              📚 Top reader: {userSummaries.sort((a, b) => b.totalLogged.pages - a.totalLogged.pages)[0]?.user.name.split(' ')[0]} with {Math.max(...userSummaries.map(u => u.totalLogged.pages))} pages
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl shadow-sm p-4 border border-blue-200">
+          <h3 className="text-base font-semibold text-blue-900 mb-4 flex items-center space-x-2">
+            <span>🏆</span>
+            <span>Competition Highlights</span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-blue-200/50">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="text-lg">📚</span>
+                <span className="font-medium text-blue-900">Top Reader</span>
+              </div>
+              <div className="text-sm text-blue-800">
+                <span className="font-semibold">{userSummaries.sort((a, b) => b.totalLogged.pages - a.totalLogged.pages)[0]?.user.name.split(' ')[0]}</span>
+                <span className="text-blue-600"> - {Math.max(...userSummaries.map(u => u.totalLogged.pages))} pages</span>
+              </div>
             </div>
-            <div>
-              🏃 Top runner: {userSummaries.sort((a, b) => b.totalLogged.kilometers - a.totalLogged.kilometers)[0]?.user.name.split(' ')[0]} with {Math.max(...userSummaries.map(u => u.totalLogged.kilometers))} km
+            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-green-200/50">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="text-lg">🏃</span>
+                <span className="font-medium text-green-900">Top Runner</span>
+              </div>
+              <div className="text-sm text-green-800">
+                <span className="font-semibold">{userSummaries.sort((a, b) => b.totalLogged.kilometers - a.totalLogged.kilometers)[0]?.user.name.split(' ')[0]}</span>
+                <span className="text-green-600"> - {Math.max(...userSummaries.map(u => u.totalLogged.kilometers))} km</span>
+              </div>
             </div>
-            <div>
-              💪 Most active: {userSummaries.sort((a, b) => b.totalLogged.minutes - a.totalLogged.minutes)[0]?.user.name.split(' ')[0]} with {Math.max(...userSummaries.map(u => u.totalLogged.minutes))} minutes
+            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-purple-200/50">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="text-lg">💪</span>
+                <span className="font-medium text-purple-900">Most Active</span>
+              </div>
+              <div className="text-sm text-purple-800">
+                <span className="font-semibold">{userSummaries.sort((a, b) => b.totalLogged.minutes - a.totalLogged.minutes)[0]?.user.name.split(' ')[0]}</span>
+                <span className="text-purple-600"> - {Math.max(...userSummaries.map(u => u.totalLogged.minutes))} minutes</span>
+              </div>
             </div>
-            <div>
-              🔥 Longest streak: {userSummaries.sort((a, b) => b.currentStreak - a.currentStreak)[0]?.user.name.split(' ')[0]} with {Math.max(...userSummaries.map(u => u.currentStreak))} days
+            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-orange-200/50">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="text-lg">🔥</span>
+                <span className="font-medium text-orange-900">Longest Streak</span>
+              </div>
+              <div className="text-sm text-orange-800">
+                <span className="font-semibold">{userSummaries.sort((a, b) => b.currentStreak - a.currentStreak)[0]?.user.name.split(' ')[0]}</span>
+                <span className="text-orange-600"> - {Math.max(...userSummaries.map(u => u.currentStreak))} days</span>
+              </div>
             </div>
           </div>
         </div>

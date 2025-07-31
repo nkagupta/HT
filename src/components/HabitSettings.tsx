@@ -5,6 +5,7 @@ import { User, Habit, HabitType, HABIT_COLORS } from '../utils/types';
 
 interface HabitSettingsProps {
   currentUser: User;
+  onUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }
 
 /**
@@ -17,15 +18,25 @@ interface HabitSuggestion {
   color: string;       // Visual identification only
 }
 
+interface EditingHabit {
+  id: string;
+  name: string;
+  target: string;
+  type: HabitType;
+  color: string;
+}
+
 interface ConfirmationState {
   isOpen: boolean;
   suggestions: HabitSuggestion[];
 }
 
-const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
+const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedChangesChange }) => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingHabits, setEditingHabits] = useState<{ [key: string]: EditingHabit }>({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info';
     message: string;
@@ -46,6 +57,12 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
   });
   const [showAddCustom, setShowAddCustom] = useState(false);
 
+  useEffect(() => {
+    if (onUnsavedChangesChange) {
+      onUnsavedChangesChange(hasUnsavedChanges);
+    }
+  }, [hasUnsavedChanges, onUnsavedChangesChange]);
+
   const habitTypes: { value: HabitType; label: string; description: string }[] = [
     { value: 'book', label: 'Reading Books', description: 'Track pages read and books finished' },
     { value: 'running', label: 'Running/Trekking', description: 'Track kilometers covered' },
@@ -60,6 +77,77 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
+  };
+
+  const updateHasUnsavedChanges = () => {
+    const hasChanges = Object.keys(editingHabits).length > 0;
+    setHasUnsavedChanges(hasChanges);
+  };
+
+  const startEditingHabit = (habit: Habit) => {
+    setEditingHabits(prev => ({
+      ...prev,
+      [habit.id]: {
+        id: habit.id,
+        name: habit.name,
+        target: habit.target || '',
+        type: habit.type,
+        color: habit.color
+      }
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const updateEditingHabit = (habitId: string, updates: Partial<EditingHabit>) => {
+    setEditingHabits(prev => ({
+      ...prev,
+      [habitId]: { ...prev[habitId], ...updates }
+    }));
+  };
+
+  const saveHabitChanges = async (habitId: string) => {
+    const editingHabit = editingHabits[habitId];
+    if (!editingHabit) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({
+          name: editingHabit.name,
+          target: editingHabit.target || null,
+          type: editingHabit.type,
+          color: editingHabit.color
+        })
+        .eq('id', habitId);
+
+      if (error) throw error;
+
+      setHabits(habits.map(h => h.id === habitId ? { ...h, ...editingHabit, target: editingHabit.target || null } : h));
+      
+      setEditingHabits(prev => {
+        const newState = { ...prev };
+        delete newState[habitId];
+        return newState;
+      });
+      
+      updateHasUnsavedChanges();
+      showNotification('success', 'Habit updated successfully!');
+    } catch (error) {
+      console.error('Error updating habit:', error);
+      showNotification('error', 'Failed to update habit. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelHabitChanges = (habitId: string) => {
+    setEditingHabits(prev => {
+      const newState = { ...prev };
+      delete newState[habitId];
+      return newState;
+    });
+    updateHasUnsavedChanges();
   };
 
   useEffect(() => {
@@ -304,32 +392,6 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
     }
   };
 
-  // Update existing habit (don't create new one)
-  const updateHabit = async (habitId: string, updates: Partial<Habit>) => {
-    if (!updates.name?.trim() && updates.name !== undefined) {
-      showNotification('error', 'Habit name cannot be empty.');
-      return;
-    }
-    
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('habits')
-        .update(updates)
-        .eq('id', habitId);
-
-      if (error) throw error;
-
-      setHabits(habits.map(h => h.id === habitId ? { ...h, ...updates } : h));
-      showNotification('success', 'Habit updated successfully!');
-    } catch (error) {
-      console.error('Error updating habit:', error);
-      showNotification('error', 'Failed to update habit. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -382,9 +444,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                   <div className="space-y-3">
                     {/* Field 1: Habit Name */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        1. Habit Name
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Habit Name</label>
                       <input
                         type="text"
                         value={suggestion.name}
@@ -396,9 +456,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                     
                     {/* Field 2: Annual Target */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        2. Annual Target
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Annual Target</label>
                       <input
                         type="text"
                         value={suggestion.target}
@@ -410,9 +468,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
                     
                     {/* Field 3: Tracking Method */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        3. Tracking Method
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tracking Method</label>
                       <select
                         value={suggestion.type}
                         onChange={(e) => updateSuggestion(index, { type: e.target.value as HabitType })}
@@ -478,29 +534,6 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
           <span className="text-sm text-gray-600">{habits.length}/6 habits</span>
         </div>
         
-        {/* Personalized Suggestions Section */}
-        <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-medium text-blue-900 mb-1">Personalized Suggestions</h3>
-              <p className="text-sm text-blue-700">
-                Get habit suggestions tailored for {currentUser.name.split(' ')[0]}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                ✓ Suggestions only - you confirm before adding
-              </p>
-            </div>
-            <button
-              onClick={showSuggestionDialog}
-              disabled={habits.length >= 6}
-              className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Zap className="w-4 h-4" />
-              <span>Get Suggestions</span>
-            </button>
-          </div>
-        </div>
-        
         {/* Add Custom Habit Button */}
         {!showAddCustom && habits.length < 6 && (
           <div className="mb-4">
@@ -523,9 +556,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
             <div className="space-y-3">
               {/* Field 1: Habit Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  1. Habit Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Habit Name</label>
                 <input
                   type="text"
                   value={newHabit.name}
@@ -537,9 +568,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
               
               {/* Field 2: Annual Target */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  2. Annual Target
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Annual Target</label>
                 <input
                   type="text"
                   value={newHabit.target}
@@ -551,9 +580,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
               
               {/* Field 3: Tracking Method */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  3. Tracking Method
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tracking Method</label>
                 <select
                   value={newHabit.type}
                   onChange={(e) => setNewHabit({ ...newHabit, type: e.target.value as HabitType })}
@@ -631,100 +658,155 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser }) => {
               </div>
             )}
             <div className="space-y-4">
-              {habits.map((habit) => (
-                <div key={habit.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-gray-900">3-Field Habit Structure:</h4>
-                    <div 
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: habit.color }}
-                    />
-                  </div>
-                  
-                  {/* Field 1: Habit Name */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">1. Habit Name</label>
-                    <input
-                      type="text"
-                      value={habit.name}
-                      onChange={(e) => {
-                        updateHabit(habit.id, { name: e.target.value });
-                      }}
-                      className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="What you're tracking"
-                    />
-                  </div>
-                  
-                  {/* Field 2: Annual Target */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">2. Annual Target</label>
-                    <input
-                      type="text"
-                      value={habit.target || ''}
-                      onChange={(e) => {
-                        updateHabit(habit.id, { target: e.target.value || null });
-                      }}
-                      className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="Your yearly objective (e.g., 12 books, 500 km, 75 kg)"
-                    />
-                  </div>
-                  
-                  {/* Field 3: Tracking Method */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">3. Tracking Method</label>
-                    <select
-                      value={habit.type}
-                      onChange={(e) => {
-                        updateHabit(habit.id, { type: e.target.value as HabitType });
-                      }}
-                      className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    >
-                      {habitTypes.map(type => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {habitTypes.find(t => t.value === habit.type)?.description}
-                    </p>
-                  </div>
+              {habits.map((habit) => {
+                const isEditing = editingHabits[habit.id];
+                const editingData = isEditing || habit;
+                
+                return (
+                  <div key={habit.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-900">Habit Details</h4>
+                      <div 
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: editingData.color }}
+                      />
+                    </div>
+                    
+                    {/* Habit Name */}
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Habit Name</label>
+                      <input
+                        type="text"
+                        value={editingData.name}
+                        onChange={(e) => {
+                          if (!isEditing) startEditingHabit(habit);
+                          updateEditingHabit(habit.id, { name: e.target.value });
+                        }}
+                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        placeholder="What you're tracking"
+                      />
+                    </div>
+                    
+                    {/* Annual Target */}
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Annual Target</label>
+                      <input
+                        type="text"
+                        value={editingData.target || ''}
+                        onChange={(e) => {
+                          if (!isEditing) startEditingHabit(habit);
+                          updateEditingHabit(habit.id, { target: e.target.value });
+                        }}
+                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        placeholder="Your yearly objective (e.g., 12 books, 500 km, 75 kg)"
+                      />
+                    </div>
+                    
+                    {/* Tracking Method */}
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tracking Method</label>
+                      <select
+                        value={editingData.type}
+                        onChange={(e) => {
+                          if (!isEditing) startEditingHabit(habit);
+                          updateEditingHabit(habit.id, { type: e.target.value as HabitType });
+                        }}
+                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      >
+                        {habitTypes.map(type => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {habitTypes.find(t => t.value === editingData.type)?.description}
+                      </p>
+                    </div>
 
-                  {/* Color Selection */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Display Color</label>
-                    <div className="flex flex-wrap gap-3">
-                      {HABIT_COLORS.map(color => (
+                    {/* Color Selection */}
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Display Color</label>
+                      <div className="flex flex-wrap gap-3">
+                        {HABIT_COLORS.map(color => (
+                          <button
+                            key={color}
+                            onClick={() => {
+                              if (!isEditing) startEditingHabit(habit);
+                              updateEditingHabit(habit.id, { color });
+                            }}
+                            className={`w-8 h-8 rounded-full border-2 transition-all ${
+                              editingData.color === color ? 'border-gray-600 scale-110' : 'border-gray-200'
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex justify-between items-center">
+                      {isEditing && (
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => saveHabitChanges(habit.id)}
+                            disabled={saving}
+                            className="flex items-center space-x-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          >
+                            <Save className="w-4 h-4" />
+                            <span className="text-sm font-medium">Save</span>
+                          </button>
+                          <button
+                            onClick={() => cancelHabitChanges(habit.id)}
+                            className="flex items-center space-x-1 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
+                          >
+                            <X className="w-4 h-4" />
+                            <span className="text-sm font-medium">Cancel</span>
+                          </button>
+                        </div>
+                      )}
+                      <div className={isEditing ? 'ml-auto' : ''}>
                         <button
-                          key={color}
-                          onClick={() => {
-                            updateHabit(habit.id, { color });
-                          }}
-                          className={`w-8 h-8 rounded-full border-2 transition-all ${
-                            habit.color === color ? 'border-gray-600 scale-110' : 'border-gray-200'
-                          }`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
+                          onClick={() => removeHabit(habit.id)}
+                          disabled={saving}
+                          className="flex items-center space-x-1 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 border border-red-200"
+                        >
+                          <X className="w-4 h-4" />
+                          <span className="text-sm font-medium">Delete</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  
-                  {/* Delete Button */}
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => removeHabit(habit.id)}
-                      disabled={saving}
-                      className="flex items-center space-x-1 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 border border-red-200"
-                    >
-                      <X className="w-4 h-4" />
-                      <span className="text-sm font-medium">Delete</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
+        
+        {/* Personalized Suggestions Section - Moved to bottom */}
+        {getPersonalizedSuggestions().length > 0 && (
+          <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-medium text-blue-900 mb-1">Personalized Suggestions</h3>
+                <p className="text-sm text-blue-700">
+                  Get habit suggestions tailored for {currentUser.name.split(' ')[0]}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  ✓ Suggestions only - you confirm before adding
+                </p>
+              </div>
+              <button
+                onClick={showSuggestionDialog}
+                disabled={habits.length >= 6}
+                className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Zap className="w-4 h-4" />
+                <span>Get Suggestions</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tracking Method Reference */}
