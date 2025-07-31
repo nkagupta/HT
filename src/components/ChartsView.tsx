@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, BarChart3, LineChart, User } from 'lucide-react';
+import { Calendar, TrendingUp, Users, BookOpen, Activity, Target, BarChart3, LineChart, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, subDays, eachDayOfInterval, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from 'date-fns';
 import { supabase } from '../lib/supabase';
@@ -7,6 +7,7 @@ import { User as UserType, UserProgress, CompetitionMetrics } from '../utils/typ
 
 interface ChartsViewProps {
   currentUser: UserType;
+  dataRefreshKey?: number;
 }
 
 type TimePeriod = 'week' | 'month' | 'quarter' | 'year';
@@ -17,7 +18,7 @@ interface ChartData {
   [key: string]: any;
 }
 
-const ChartsView: React.FC<ChartsViewProps> = ({ currentUser }) => {
+const ChartsView: React.FC<ChartsViewProps> = ({ currentUser, dataRefreshKey }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('month');
   const [selectedChart, setSelectedChart] = useState<ChartType>('overview');
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -25,6 +26,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser }) => {
   const [competitionData, setCompetitionData] = useState<CompetitionMetrics[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentDisplayDate, setCurrentDisplayDate] = useState(new Date());
 
   const periods = [
     { value: 'week' as TimePeriod, label: 'This Week', days: 7 },
@@ -72,9 +74,31 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser }) => {
     // Regular small dot for other points
     return <circle cx={cx} cy={cy} r={2} fill={props.stroke} />;
   };
+
+  const navigatePeriod = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDisplayDate);
+    
+    switch (selectedPeriod) {
+      case 'week':
+        newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+        break;
+      case 'month':
+        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+        break;
+      case 'quarter':
+        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 3 : -3));
+        break;
+      case 'year':
+        newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
+        break;
+    }
+    
+    setCurrentDisplayDate(newDate);
+  };
+
   useEffect(() => {
     loadAllData();
-  }, [selectedPeriod, selectedChart, currentUser.id]);
+  }, [selectedPeriod, selectedChart, currentUser.id, dataRefreshKey]);
 
   const getDateRange = () => {
     const now = new Date();
@@ -595,7 +619,33 @@ const ChartsView: React.FC<ChartsViewProps> = ({ currentUser }) => {
       <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-900">{getChartTitle()}</h3>
-          <Target className="w-5 h-5 text-blue-500" />
+          <Target className="w-5 h-5 text-green-500" />
+        </div>
+        
+        {/* Navigation Controls */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => navigatePeriod('prev')}
+            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span>Previous</span>
+          </button>
+          
+          <div className="text-sm font-medium text-gray-700">
+            {selectedPeriod === 'week' 
+              ? format(getDateRange().startDate, 'MMM dd') + ' - ' + format(getDateRange().endDate, 'MMM dd, yyyy')
+              : format(currentDisplayDate, 'MMMM yyyy')
+            }
+          </div>
+          
+          <button
+            onClick={() => navigatePeriod('next')}
+            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+          >
+            <span>Next</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
         {renderChart()}

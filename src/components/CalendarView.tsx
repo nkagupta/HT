@@ -211,14 +211,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     const dateKey = getDateKey(date);
     const completionKey = `${dateKey}-${habitId}`;
     
-    // Check if this is a new completion for confetti animation
-    const previousCompletion = completions[completionKey]?.data || pendingChanges[completionKey]?.data;
-    const habit = habits.find(h => h.id === habitId);
-    
-    if (habit && isHabitNewlyCompleted(habit, previousCompletion, data)) {
-      triggerConfetti(habit.type);
-    }
-    
     // Store changes locally without saving to database
     setPendingChanges(prev => ({
       ...prev,
@@ -270,7 +262,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     
     setTimeout(() => {
       setShowConfetti(false);
-    }, 3000);
+    }, 2000);
   };
 
   const saveAllChanges = async () => {
@@ -290,6 +282,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 
       if (error) throw error;
 
+      // Check for new completions and trigger confetti
+      savedCompletions?.forEach(completion => {
+        const habit = habits.find(h => h.id === completion.habit_id);
+        if (habit) {
+          const completionKey = `${completion.date}-${completion.habit_id}`;
+          const previousCompletion = completions[completionKey]?.data;
+          
+          if (isHabitNewlyCompleted(habit, previousCompletion, completion.data)) {
+            triggerConfetti(habit.type);
+          }
+        }
+      });
       // Update local completions state
       const updatedCompletions = { ...completions };
       savedCompletions?.forEach(completion => {
@@ -550,13 +554,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           <div className="flex items-center space-x-3">
             <button
               onClick={() => navigateDay('prev')}
-              className="p-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors touch-manipulation"
+              className="p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors touch-manipulation"
             >
               <ChevronLeft className="w-7 h-7" />
             </button>
             <button
               onClick={() => navigateDay('next')}
-              className="p-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors touch-manipulation"
+              className="p-3 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors touch-manipulation"
             >
               <ChevronRight className="w-7 h-7" />
             </button>
@@ -565,7 +569,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             {!isToday && (
               <button
                 onClick={goToToday}
-                className="px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors touch-manipulation"
+                className="px-3 py-2 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-colors touch-manipulation"
               >
                 Today
               </button>
@@ -576,7 +580,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                 disabled={!hasUnsavedChanges || saving}
                 className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-manipulation ${
                   hasUnsavedChanges
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700'
+                    ? 'bg-gradient-to-r from-green-600 to-lime-600 text-white hover:from-green-700 hover:to-lime-700'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 } ${saveSuccess ? 'bg-green-600 hover:bg-green-600' : ''}`}
               >
@@ -595,7 +599,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             {/* Info Button - moved here */}
             <button
               onClick={() => setShowInfoModal(true)}
-              className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 bg-opacity-20 text-purple-600 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors backdrop-blur-sm border border-purple-200"
+              className="w-8 h-8 bg-gradient-to-br from-green-500 to-lime-500 bg-opacity-20 text-green-600 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors backdrop-blur-sm border border-green-200"
               title="How to unlock celebrations"
             >
               <Info className="w-4 h-4" />

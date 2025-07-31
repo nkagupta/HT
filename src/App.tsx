@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Download, Upload, User, LogOut, Settings, AlertTriangle } from 'lucide-react';
+import { Calendar, Download, Upload, User, LogOut, Settings, AlertTriangle, Menu, X, Info } from 'lucide-react';
 import { BarChart } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import LoginScreen from './components/LoginScreen';
@@ -36,6 +36,10 @@ function App() {
   
   // Track unsaved changes in settings
   const [settingsHaveUnsavedChanges, setSettingsHaveUnsavedChanges] = useState(false);
+  
+  // Hamburger menu and about modal state
+  const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   
   // Reference to hidden file input for data import
   const [importFileRef] = useState<React.RefObject<HTMLInputElement>>(React.createRef());
@@ -414,12 +418,12 @@ function App() {
         
         {/* Charts View - Data visualization and progress tracking */}
         {currentView === 'charts' && (
-          <ChartsView currentUser={currentUser} />
+          <ChartsView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />
         )}
         
         {/* Summary View - Progress overview and statistics */}
         {currentView === 'summary' && (
-          <SummaryView currentUser={currentUser} />
+          <SummaryView currentUser={currentUser} dataRefreshKey={dataRefreshKey} />
         )}
         
         {/* Settings View - Habit management */}
@@ -427,6 +431,7 @@ function App() {
           <HabitSettings
             currentUser={currentUser}
             onUnsavedChangesChange={setSettingsHaveUnsavedChanges}
+            onDataRefresh={incrementDataRefreshKey}
           />
         )}
       </main>

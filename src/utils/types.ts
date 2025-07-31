@@ -207,6 +207,15 @@ export const isWithinSevenDays = (date: Date): boolean => {
   return date >= sevenDaysAgo && date <= today;
 };
 
+/** Check if a date is within the last 14 days (for edit/delete permissions) */
+export const isWithinFourteenDays = (date: Date): boolean => {
+  const today = new Date();
+  const fourteenDaysAgo = new Date(today);
+  fourteenDaysAgo.setDate(today.getDate() - 14);
+  
+  return date >= fourteenDaysAgo && date <= today;
+};
+
 /**
  * Predefined AI Learning Topics
  * Used in the AI learning habit type for consistent topic selection

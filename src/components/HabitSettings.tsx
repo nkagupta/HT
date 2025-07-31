@@ -57,6 +57,17 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedCha
   });
   const [showAddCustom, setShowAddCustom] = useState(false);
 
+  // Manage entries state
+  const [selectedDateForManagement, setSelectedDateForManagement] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [selectedHabitIdForManagement, setSelectedHabitIdForManagement] = useState('');
+  const [loadedCompletionForManagement, setLoadedCompletionForManagement] = useState<HabitCompletion | null>(null);
+  const [isEditingLoadedEntry, setIsEditingLoadedEntry] = useState(false);
+  const [editFormData, setEditFormData] = useState<HabitCompletionData | null>(null);
+  const [entryManagementError, setEntryManagementError] = useState<string | null>(null);
+
   useEffect(() => {
     if (onUnsavedChangesChange) {
       onUnsavedChangesChange(hasUnsavedChanges);
@@ -682,7 +693,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedCha
                           if (!isEditing) startEditingHabit(habit);
                           updateEditingHabit(habit.id, { name: e.target.value });
                         }}
-                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
                         placeholder="What you're tracking"
                       />
                     </div>
@@ -697,7 +708,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedCha
                           if (!isEditing) startEditingHabit(habit);
                           updateEditingHabit(habit.id, { target: e.target.value });
                         }}
-                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
                         placeholder="Your yearly objective (e.g., 12 books, 500 km, 75 kg)"
                       />
                     </div>
@@ -711,7 +722,7 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedCha
                           if (!isEditing) startEditingHabit(habit);
                           updateEditingHabit(habit.id, { type: e.target.value as HabitType });
                         }}
-                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
                       >
                         {habitTypes.map(type => (
                           <option key={type.value} value={type.value}>
@@ -807,6 +818,151 @@ const HabitSettings: React.FC<HabitSettingsProps> = ({ currentUser, onUnsavedCha
             </div>
           </div>
         )}
+      </div>
+
+      {/* Manage Past Entries Section */}
+      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+        <h3 className="text-base font-semibold text-gray-900 mb-3">Manage Past Entries</h3>
+        <p className="text-sm text-gray-600 mb-4">Edit or delete habit entries from previous days (within 14 days).</p>
+        
+        <div className="space-y-4">
+          {/* Date and Habit Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
+              <input
+                type="date"
+                value={selectedDateForManagement}
+                onChange={(e) => setSelectedDateForManagement(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Habit</label>
+              <select
+                value={selectedHabitIdForManagement}
+                onChange={(e) => setSelectedHabitIdForManagement(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+              >
+                <option value="">Choose a habit</option>
+                {habits.map(habit => (
+                  <option key={habit.id} value={habit.id}>{habit.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Load Entry Button */}
+          <button
+            onClick={handleLoadEntry}
+            disabled={saving || !selectedDateForManagement || !selectedHabitIdForManagement}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Info className="w-4 h-4" />
+            )}
+            <span>Load Entry</span>
+          </button>
+
+          {/* Error Display */}
+          {entryManagementError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+              {entryManagementError}
+            </div>
+          )}
+
+          {/* Loaded Entry Display */}
+          {loadedCompletionForManagement && (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Entry for {new Date(selectedDateForManagement).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </h4>
+                <div className="flex items-center space-x-2">
+                  <div 
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: habits.find(h => h.id === selectedHabitIdForManagement)?.color }}
+                  />
+                  <span className="text-sm text-gray-600">
+                    {habits.find(h => h.id === selectedHabitIdForManagement)?.name}
+                  </span>
+                </div>
+              </div>
+
+              {/* Entry Data */}
+              <div className="mb-4">
+                {habits.find(h => h.id === selectedHabitIdForManagement) && editFormData && 
+                  renderEntryData(
+                    habits.find(h => h.id === selectedHabitIdForManagement)!,
+                    editFormData,
+                    isEditingLoadedEntry
+                  )
+                }
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2">
+                {!isEditingLoadedEntry ? (
+                  <>
+                    <button
+                      onClick={handleEditEntry}
+                      disabled={saving || !isWithinFourteenDays(new Date(selectedDateForManagement))}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={handleDeleteEntry}
+                      disabled={saving}
+                      className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      Delete
+                    </button>
+                    {!isWithinFourteenDays(new Date(selectedDateForManagement)) && (
+                      <div className="text-xs text-gray-500 flex items-center">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Entries older than {new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })} cannot be edited
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={saving}
+                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center space-x-1"
+                    >
+                      {saving ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Save className="w-3 h-3" />
+                      )}
+                      <span>Save Changes</span>
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      disabled={saving}
+                      className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tracking Method Reference */}

@@ -14,7 +14,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
 
   useEffect(() => {
     loadAllUserSummaries();
-  }, [currentUser.id]);
+  }, [currentUser.id, dataRefreshKey]);
 
   const loadAllUserSummaries = async () => {
     setLoading(true);
@@ -258,6 +258,11 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
     return total > 0 ? `${Math.round(total * 10) / 10} ${unit}` : 'No activity';
   };
 
+  const calculateLikelihood = (habit: any, completions: any[]): number => {
+    // Placeholder function - implement your likelihood calculation logic here
+    return Math.random() * 100;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -414,9 +419,10 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
                   <h4 className="text-xs font-medium text-gray-900 uppercase tracking-wide">Individual Habits</h4>
                   {summary.habits.length > 0 ? (
                     summary.habits.map((habit) => {
-                      const userCompletions = []; // We'd need to pass this data down or refetch
+                      const likelihood = calculateLikelihood(habit, summary.allCompletions || []);
+                      
                       return (
-                        <div key={habit.id} className="p-2 bg-gray-50 rounded-lg">
+                        <div key={habit.id} className="p-2 bg-gray-50 rounded-lg flex items-center justify-between">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                               <div 
@@ -428,6 +434,27 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser }) => {
                             <div className="text-xs text-gray-500">
                               {habit.target && `Target: ${habit.target}`}
                             </div>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">{habit.name}</span>
+                            {habit.target && (
+                              <div className="text-xs text-gray-500">Target: {habit.target}</div>
+                            )}
+                          </div>
+                          
+                          {/* Likelihood Button */}
+                          <div 
+                            className="w-12 h-8 rounded-md flex items-center justify-center text-xs font-bold text-white shadow-sm"
+                            style={{
+                              background: `linear-gradient(90deg, 
+                                ${likelihood < 50 ? 
+                                  `rgb(239, 68, 68) ${100-likelihood}%, rgb(34, 197, 94) ${likelihood}%` : 
+                                  `rgb(239, 68, 68) ${100-likelihood}%, rgb(34, 197, 94) ${likelihood}%`
+                                })`
+                            }}
+                            title={`${Math.round(likelihood)}% likely to complete by July 31, 2026`}
+                          >
+                            {Math.round(likelihood)}%
                           </div>
                         </div>
                       );
