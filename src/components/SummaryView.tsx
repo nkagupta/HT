@@ -304,7 +304,9 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser, dataRefreshKey =
       return null;
     }
     
+    const targetMatch = habit.target?.match(/(\d+)/);
     const targetValue = parseInt(targetMatch[1]);
+    const unit = getHabitUnit(habit.type);
     
     switch (habit.type) {
       case 'book':
@@ -361,6 +363,20 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser, dataRefreshKey =
     const percentage = Math.min(100, Math.max(0, (expectedProgress / targetValue) * 100));
     
     return { percentage, currentProgress, targetValue, unit };
+  };
+
+  const getDefaultTarget = (habitType: string): number => {
+    switch (habitType) {
+      case 'book': return 12;
+      case 'running': return 1000;
+      case 'ai_learning': return 365;
+      case 'job_search': return 100;
+      case 'swimming': return 100;
+      case 'weight': return 10000;
+      case 'exercise': return 10000;
+      case 'instagram': return 1000;
+      default: return 100;
+    }
   };
 
   const getHabitUnit = (habitType: string): string => {
@@ -646,6 +662,11 @@ const SummaryView: React.FC<SummaryViewProps> = ({ currentUser, dataRefreshKey =
                             <div>
                               <span className="text-sm font-medium text-gray-900">{habit.name}</span>
                               <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                {getUpdateIcon(weeklyUpdates.currentWeek, weeklyUpdates.lastWeek)}
+                                <span>{weeklyUpdates.currentWeek} this week</span>
+                              </div>
+                            </div>
+                          </div>
                           {progressData ? (
                             <button
                               onClick={() => showProgressDetails(habit, userCompletions)}
