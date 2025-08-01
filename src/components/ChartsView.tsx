@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { TrendingUp, BookOpen, Activity, Trophy, Info, Calendar, Clock } from 'lucide-react';
 import { Habit, HabitCompletion, User } from '../utils/types';
 
@@ -218,65 +218,6 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
 
   return (
     <div className="p-4 max-w-6xl mx-auto">
-      {/* Period Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-600 font-medium">Period Highlights</p>
-              <div className="mt-2 space-y-1">
-                {periodHighlights.length > 0 ? (
-                  periodHighlights.slice(0, 2).map((highlight, index) => (
-                    <p key={index} className="text-xs text-blue-700">{highlight}</p>
-                  ))
-                ) : (
-                  <p className="text-xs text-blue-700">No activity yet</p>
-                )}
-              </div>
-            </div>
-            <TrendingUp className="w-8 h-8 text-blue-500" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-green-600 font-medium">Total Completions</p>
-              <p className="text-2xl font-bold text-green-800">
-                {safeHabitCompletions.filter(c => {
-                  const { start, end } = getDateRange();
-                  const completionDate = new Date(c.date);
-                  return completionDate >= start && completionDate <= end;
-                }).length}
-              </p>
-            </div>
-            <Clock className="w-8 h-8 text-green-500" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-purple-600 font-medium">Active Days</p>
-              <p className="text-2xl font-bold text-purple-800">
-                {(() => {
-                  const { start, end } = getDateRange();
-                  const activeDays = new Set();
-                  safeHabitCompletions.forEach(c => {
-                    const completionDate = new Date(c.date);
-                    if (completionDate >= start && completionDate <= end) {
-                      activeDays.add(c.date);
-                    }
-                  });
-                  return activeDays.size;
-                })()}
-              </p>
-            </div>
-            <Calendar className="w-8 h-8 text-purple-500" />
-          </div>
-        </div>
-      </div>
-
       {/* Chart Type Selector */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
@@ -376,7 +317,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
             </ResponsiveContainer>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: timePeriod === 'week' ? 60 : 20 }}>
+              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: timePeriod === 'week' ? 60 : 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="date" 
@@ -395,14 +336,82 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
                   ]}
                   labelFormatter={(label) => `Date: ${label.replace('\n', ' ')}`}
                 />
-                <Bar 
+                <Line 
                   dataKey="value" 
-                  fill="#3B82F6" 
-                  radius={[4, 4, 0, 0]}
+                  stroke="#3B82F6" 
+                  strokeWidth={3}
+                  dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2 }}
                 />
-              </BarChart>
+              </LineChart>
             </ResponsiveContainer>
           )}
+        </div>
+      </div>
+
+      {/* Period Summary Card - Moved to bottom */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          <TrendingUp className="w-5 h-5 mr-2 text-blue-600" />
+          Period Highlights & Statistics
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-600 font-medium">Period Highlights</p>
+                <div className="mt-2 space-y-1">
+                  {periodHighlights.length > 0 ? (
+                    periodHighlights.slice(0, 2).map((highlight, index) => (
+                      <p key={index} className="text-xs text-blue-700">{highlight}</p>
+                    ))
+                  ) : (
+                    <p className="text-xs text-blue-700">No activity yet</p>
+                  )}
+                </div>
+              </div>
+              <TrendingUp className="w-8 h-8 text-blue-500" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-green-600 font-medium">Total Completions</p>
+                <p className="text-2xl font-bold text-green-800">
+                  {safeHabitCompletions.filter(c => {
+                    const { start, end } = getDateRange();
+                    const completionDate = new Date(c.date);
+                    return completionDate >= start && completionDate <= end;
+                  }).length}
+                </p>
+              </div>
+              <Clock className="w-8 h-8 text-green-500" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-purple-600 font-medium">Active Days</p>
+                <p className="text-2xl font-bold text-purple-800">
+                  {(() => {
+                    const { start, end } = getDateRange();
+                    const activeDays = new Set();
+                    safeHabitCompletions.forEach(c => {
+                      const completionDate = new Date(c.date);
+                      if (completionDate >= start && completionDate <= end) {
+                        activeDays.add(c.date);
+                      }
+                    });
+                    return activeDays.size;
+                  })()}
+                </p>
+              </div>
+              <Calendar className="w-8 h-8 text-purple-500" />
+            </div>
+          </div>
         </div>
       </div>
 
