@@ -36,6 +36,37 @@ const SummaryView: React.FC<SummaryViewProps> = ({
   const [newBookTitle, setNewBookTitle] = useState('');
   const [newBookPages, setNewBookPages] = useState('');
 
+  // Helper function to get all users with their weekly progress
+  const getAllUsersProgress = useMemo(() => {
+    return users.map(user => {
+      const userHabits = habits.filter(h => h.user_id === user.id);
+      
+      // Calculate weekly completion for this user
+      const now = new Date();
+      const currentWeekStart = getWeekStart(now);
+      const currentWeekEnd = new Date(currentWeekStart);
+      currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+      
+      const weeklyCompletions = habitCompletions.filter(c => {
+        if (c.user_id !== user.id) return false;
+        const completionDate = new Date(c.date);
+        return completionDate >= currentWeekStart && completionDate <= currentWeekEnd;
+      });
+      
+      const completedDays = new Set(weeklyCompletions.map(c => c.date)).size;
+      const totalPossibleDays = Math.min(7, userHabits.length * 7); // Max 7 days per week
+      
+      return {
+        user,
+        habits: userHabits,
+        completedDays,
+        totalPossibleDays: 7, // Always show out of 7 days
+        weeklyCompletions: weeklyCompletions.length,
+        habitsCount: userHabits.length
+      };
+    }).filter(userProgress => userProgress.habitsCount > 0); // Only show users with habits
+  }, [users, habits, habitCompletions]);
+
   // Helper function to get week start (Sunday)
   const getWeekStart = (date: Date) => {
     const d = new Date(date);
@@ -208,99 +239,123 @@ const SummaryView: React.FC<SummaryViewProps> = ({
       {/* Progress Tab */}
       {activeTab === 'progress' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800">Weekly Progress</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-800">All Users Progress</h2>
             <div className="text-sm text-gray-500">
-              Current week vs last week
+              Weekly completion summary
             </div>
           </div>
 
-          {userHabitsWithData.length === 0 ? (
+          {getAllUsersProgress.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p>No habits found. Add some habits to track your progress!</p>
+              <p>No users with habits found.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {userHabitsWithData.map((habit) => {
-                const isExpanded = expandedHabits.has(habit.id);
-                const TrendIcon = habit.trend === 'up' ? TrendingUp : 
-                                habit.trend === 'down' ? TrendingDown : Minus;
-                const trendColor = habit.trend === 'up' ? 'text-green-500' : 
-                                 habit.trend === 'down' ? 'text-red-500' : 'text-blue-500';
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {getAllUsersProgress.map((userProgress) => {
+                const isCurrentUser = userProgress.user.id === currentUser.id;
+                const completionPercentage = Math.round((userProgress.completedDays / 7) * 100);
 
                 return (
-                  <div key={habit.id} className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between">
+                  <div 
+                    key={userProgress.user.id} 
+                    className={`bg-white rounded-lg border-2 p-6 transition-all hover:shadow-md ${
+                      isCurrentUser ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                    }`}
+                  >
+                    {/* User Header */}
+                    <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-3">
-                        <div
-                          className="w-4 h-4 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: habit.color }}
-                        />
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                          isCurrentUser ? 'bg-blue-600' : 'bg-gray-600'
+                        }`}>
+                          {userProgress.user.name.charAt(0).toUpperCase()}
+                        </div>
                         <div>
-                          <h3 className="font-medium text-gray-800">{habit.name}</h3>
-                          <p className="text-sm text-gray-500 capitalize">
-                            {habit.type.replace('_', ' ')}
+                          <h3 className={`font-semibold ${isCurrentUser ? 'text-blue-900' : 'text-gray-800'}`}>
+                            {userProgress.user.name}
+                            {isCurrentUser && <span className="text-sm font-normal text-blue-600 ml-2">(You)</span>}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            {userProgress.habitsCount} habit{userProgress.habitsCount !== 1 ? 's' : ''}
                           </p>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="flex items-center space-x-4">
-                        {/* Weekly Progress Display */}
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-gray-800">
-                            {habit.currentWeek}/{habit.totalPossible}
-                          </div>
-                          <div className="text-xs text-gray-500">This week</div>
-                        </div>
-
-                        <div className="text-center">
-                          <div className="text-lg font-medium text-gray-600">
-                            {habit.lastWeek}/{habit.totalPossible}
-                          </div>
-                          <div className="text-xs text-gray-500">Last week</div>
-                        </div>
-
-                        <TrendIcon className={`w-5 h-5 ${trendColor}`} />
-
-                        <button
-                          onClick={() => toggleHabitExpansion(habit.id)}
-                          className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                        >
-                          {isExpanded ? 
-                            <ChevronUp className="w-5 h-5 text-gray-500" /> : 
-                            <ChevronDown className="w-5 h-5 text-gray-500" />
-                          }
-                        </button>
+                    {/* Weekly Progress */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Weekly Progress</span>
+                        <span className={`text-sm font-bold ${
+                          completionPercentage >= 70 ? 'text-green-600' : 
+                          completionPercentage >= 40 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {userProgress.completedDays}/7 days
+                        </span>
+                      </div>
+                      
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className={`h-3 rounded-full transition-all ${
+                            completionPercentage >= 70 ? 'bg-green-500' : 
+                            completionPercentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${completionPercentage}%` }}
+                        />
+                      </div>
+                      
+                      <div className="text-xs text-gray-500 mt-1">
+                        {completionPercentage}% completion rate
                       </div>
                     </div>
 
-                    {/* Expanded 4-week trend chart */}
-                    {isExpanded && (
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">
-                          4-Week Trend
-                        </h4>
-                        <div className="h-48">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={habit.fourWeekData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="week" />
-                              <YAxis domain={[0, 7]} />
-                              <Tooltip 
-                                formatter={(value: number) => [`${value} days`, 'Completions']}
-                                labelFormatter={(label) => `Week: ${label}`}
-                              />
-                              <Bar 
-                                dataKey="completions" 
-                                fill={habit.color || '#3B82F6'} 
-                                radius={[4, 4, 0, 0]}
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
+                    {/* Habits Summary */}
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Active Habits</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {userProgress.habits.slice(0, 4).map((habit) => (
+                          <div key={habit.id} className="flex items-center space-x-2 p-2 bg-gray-50 rounded-md">
+                            <div
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: habit.color }}
+                            />
+                            <span className="text-xs text-gray-700 truncate">
+                              {habit.name}
+                            </span>
+                          </div>
+                        ))}
+                        {userProgress.habits.length > 4 && (
+                          <div className="flex items-center justify-center p-2 bg-gray-100 rounded-md">
+                            <span className="text-xs text-gray-500">
+                              +{userProgress.habits.length - 4} more
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                          <div className={`text-lg font-bold ${isCurrentUser ? 'text-blue-600' : 'text-gray-800'}`}>
+                            {userProgress.weeklyCompletions}
+                          </div>
+                          <div className="text-xs text-gray-500">Total Logs</div>
+                        </div>
+                        <div>
+                          <div className={`text-lg font-bold ${
+                            completionPercentage >= 70 ? 'text-green-600' : 
+                            completionPercentage >= 40 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {completionPercentage}%
+                          </div>
+                          <div className="text-xs text-gray-500">Success Rate</div>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
