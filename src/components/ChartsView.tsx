@@ -220,11 +220,11 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
     <div className="p-4 max-w-6xl mx-auto">
       {/* Chart Type Selector */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
+        <div className="flex flex-col items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 sm:mb-0">Analytics Dashboard</h2>
           
           {/* Time Period Toggle */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 mt-2">
             <button
               onClick={() => setTimePeriod('week')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
@@ -290,15 +290,15 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
         </div>
 
         {/* Chart Display */}
-        <div className="bg-gray-50 rounded-lg p-4" style={{ height: timePeriod === 'week' ? '320px' : '300px' }}>
+        <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-center" style={{ height: timePeriod === 'week' ? '400px' : '380px' }}>
           {selectedChart === 'competition' ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="95%" height="90%">
               <BarChart data={competitionData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="user" 
                   tick={{ fontSize: 12 }}
-                  interval={0}
+                  interval="preserveStartEnd"
                   angle={-45}
                   textAnchor="end"
                   height={60}
@@ -316,18 +316,18 @@ const ChartsView: React.FC<ChartsViewProps> = ({ habits, habitCompletions, users
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: timePeriod === 'week' ? 60 : 20 }}>
+            <ResponsiveContainer width="95%" height="90%">
+              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: timePeriod === 'week' ? 80 : 60 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="date" 
                   tick={{ fontSize: 10 }}
-                  interval={0}
+                  interval={timePeriod === 'week' ? 0 : 'preserveStartEnd'}
                   angle={timePeriod === 'month' ? -45 : 0}
                   textAnchor={timePeriod === 'month' ? 'end' : 'middle'}
-                  height={timePeriod === 'week' ? 80 : 60}
+                  height={timePeriod === 'week' ? 100 : 80}
                 />
-                <YAxis />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip 
                   formatter={(value: number, name: string) => [
                     selectedChart === 'overview' ? `${value}%` : 
