@@ -36,6 +36,14 @@ const SummaryView: React.FC<SummaryViewProps> = ({
   const [newBookTitle, setNewBookTitle] = useState('');
   const [newBookPages, setNewBookPages] = useState('');
 
+  // Helper function to get week start (Sunday)
+  const getWeekStart = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day;
+    return new Date(d.setDate(diff));
+  };
+
   // Helper function to get all users with their weekly progress
   const getAllUsersProgress = useMemo(() => {
     return users.map(user => {
@@ -66,14 +74,6 @@ const SummaryView: React.FC<SummaryViewProps> = ({
       };
     }).filter(userProgress => userProgress.habitsCount > 0); // Only show users with habits
   }, [users, habits, habitCompletions]);
-
-  // Helper function to get week start (Sunday)
-  const getWeekStart = (date: Date) => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    return new Date(d.setDate(diff));
-  };
 
   // Get current and last week's data for each habit
   const getWeeklyData = (habitId: string) => {
